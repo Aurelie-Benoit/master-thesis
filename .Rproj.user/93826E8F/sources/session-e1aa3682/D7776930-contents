@@ -1,0 +1,750 @@
+---
+title: "esr"
+output: html_document
+date: "2025-10-22"
+---
+
+
+```{r}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("Blood_count.xlsx")
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks-Id`
+  )
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    esr        = `ESR (mm/h)`
+  )
+```
+
+```{r}
+Blood_data_clean <- Blood_count %>%
+  select(
+    Groupe,
+    Shark_Id,
+    Sex,
+    week,
+    total_cell, 
+    Eggs,
+    esr
+  ) %>%
+  filter(
+    !is.na(total_cell) & 
+    !is.na(Groupe) & 
+    !is.na(week)
+)
+```
+
+```{r}
+cat("Original rows:", nrow(Blood_count), "\n")
+cat("Cleaned rows:", nrow(Blood_data_clean), "\n")
+head(Blood_data_clean)
+```
+
+```{r}
+library(dplyr)
+
+# Create the new binary factor: 'No' (0) vs. 'Yes' (1 or 2)
+Blood_data_clean <- Blood_data_clean %>%
+  mutate(
+    # Map the specific numeric Eggs values to a factor
+    Egg_State_Binary = case_when(
+      Eggs %in% c(1, 2) ~ "Yes",  # 1 or 2 = Eggs present/developed
+      Eggs == 0 ~ "No",           # 0 = No eggs (just laid)
+      TRUE ~ NA_character_        # Preserves all other values (like the reference level, or NA for males) as NA
+    ),
+    # Convert the new column to a factor, setting "No" as the reference level
+    Egg_State_Binary = factor(Egg_State_Binary, levels = c("No", "Yes"))
+  )
+
+```
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+
+# --- 0. Data Cleaning ---
+# Fix French label (Assuming Blood_data_clean is the current working dataframe name)
+Blood_data_clean$Groupe[Blood_data_clean$Groupe == "Contrôle"] <- "Control"
+
+# Convert to numeric and factors
+Blood_data_clean <- Blood_data_clean %>%
+  mutate(
+    esr_numeric = as.numeric(as.character(esr)),
+    # Create the descriptive factor for weeks for better labels
+    week_label = factor(
+      paste("Week", week), 
+      levels = c("Week 4", "Week 6", "Week 8") # Ensure the order is correct
+    ),
+    # Explicitly set factor levels 
+    Groupe_factor = factor(Groupe, levels = c("Control", "Winter", "Summer"))
+  )
+
+# --- 1. Remove NA ESR values ---
+Blood_data_esr_clean <- Blood_data_clean %>%
+  filter(!is.na(esr_numeric))
+
+# --- 2. Define custom colors (Using the Antibody plot's palette) ---
+antibody_colors <- c(
+  "Control" = "#D6C9AE", # Antibody Control color
+  "Winter"  = "#6F9FCC", # Antibody Winter color
+  "Summer"  = "#D97A66"  # Antibody Summer color
+)
+
+# --- 3. Create Cleaned Boxplot ---
+boxplot_grouped_esr_final <- ggplot(
+  Blood_data_esr_clean, 
+  aes(x = Groupe_factor, y = esr_numeric, fill = Groupe_factor) # X-axis is Group
+) +
+  # Use geom_boxplot
+  geom_boxplot(
+    # Use solid black dots for outliers
+    outlier.shape = 19, 
+    outlier.colour = "black", 
+    outlier.size = 2
+  ) +
+  
+  # --- Facet by Descriptive Week Label, moved to the BOTTOM ---
+  facet_wrap(
+    ~ week_label, 
+    scales = "fixed", 
+    strip.position = "bottom" # Moves the labels below the panels
+  ) +
+  
+  # Apply the Antibody Colors
+  scale_fill_manual(values = antibody_colors) + # CRITICAL FIX: Use the new color set
+  
+  # Labels and Theme Adjustments
+  labs(
+    title = "", # Removed Plot Title
+    x = "", # Removed X-axis label
+    y = "ESR Value",
+    fill = "" # Removed Legend Title
+  ) +
+  
+  # Use a clean theme
+  theme_minimal(base_size = 14) +
+  theme(
+        # Remove the x-axis labels (Control, Summer, Winter)
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        
+        # Adjust facet strip to be at the bottom and clean up background
+        strip.placement = "outside",
+        strip.background = element_blank(), 
+        strip.text = element_text(face = "bold", size = 12), 
+        
+        legend.position = "bottom",
+        panel.spacing = unit(0.5, "lines")
+  )
+
+print(boxplot_grouped_esr_final)
+```
+```{r}
+library(car)  # Needed for leveneTest
+
+# Levene's test for homogeneity of variances across groups and weeks
+levene_result_esr <- leveneTest(esr_numeric ~ Groupe * week, 
+                                data = Blood_data_esr_clean)
+print(levene_result_esr)
+
+```
+```{r}
+shapiro_result <- shapiro.test(Blood_data_esr_clean$esr_numeric)
+
+print(shapiro_result)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+
+# --- 0. Data Cleaning and Preparation (Re-run to ensure consistency) ---
+# We use the 'Blood_data_clean' object and create the necessary factored/numeric columns.
+Blood_data_clean <- Blood_data_clean %>%
+  # 1. Ensure a clean numeric ESR column exists
+  mutate(esr_numeric = as.numeric(as.character(esr))) %>%
+  # 2. Ensure 'Groupe' and 'week' are factors
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# 3. Create a filtered dataset containing only valid ESR data
+Blood_data_esr_clean <- Blood_data_clean %>%
+  filter(!is.na(esr_numeric)) 
+
+# --- 1. Create the QQ Plot for ESR ---
+qq_plots_esr <- ggplot(Blood_data_esr_clean, aes(sample = esr_numeric)) +
+  
+  # Create a separate panel for every unique Groupe/week combination
+  # Note: The facet_grid syntax here is Y_variable ~ X_variable
+  facet_grid(Groupe ~ week) +
+  
+  # Add the plot points and the normality line
+  stat_qq() + 
+  stat_qq_line() +
+  
+  # Customize labels and theme
+  labs(
+    title = "QQ Plots for ESR Value: Normality Check by Groupe and Week",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles (ESR Value)"
+  ) +
+  theme_bw()
+
+# --- 2. Display the plot ---
+print(qq_plots_esr)
+```
+```{r}
+library(tidyverse)
+library(dplyr)
+
+# --- 0. Data Cleaning and Preparation ---
+
+Blood_data_clean <- Blood_data_clean %>%
+  # 1. Create a clean numeric ESR column
+  mutate(esr_numeric = as.numeric(as.character(esr))) %>%
+  # 2. Ensure 'Groupe' and 'week' are factors
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# 3. Filter out rows with NA in the numeric ESR data
+Blood_data_esr_clean <- Blood_data_clean %>%
+  filter(!is.na(esr_numeric)) 
+
+# --- 1. Define and Apply Safe Shapiro-Wilk Test ---
+
+# Function to safely extract Shapiro-Wilk results
+safe_shapiro_test <- function(data) {
+  n <- length(data)
+  
+  # Shapiro-Wilk test requires between 3 and 5000 samples
+  if (n >= 3 && n <= 5000) {
+    # Check for zero variance (test fails if all values are identical)
+    if (var(data, na.rm = TRUE) == 0) {
+      return(tibble(n = n, shapiro_w = NA_real_, shapiro_p = NA_real_, note = "Zero variance"))
+    }
+    
+    # Perform the test
+    test_result <- shapiro.test(data)
+    return(tibble(
+      n = n,
+      shapiro_w = test_result$statistic,
+      shapiro_p = test_result$p.value,
+      note = NA_character_
+    ))
+  } else {
+    return(tibble(n = n, shapiro_w = NA_real_, shapiro_p = NA_real_, note = "Sample size issue"))
+  }
+}
+
+# Apply the test across all subgroups (Groupe by week)
+shapiro_results <- Blood_data_esr_clean %>%
+  group_by(Groupe, week) %>%
+  do(safe_shapiro_test(.$esr_numeric)) %>%
+  ungroup()
+
+
+print(shapiro_results)
+
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+
+# --- 0. Data Cleaning and Preparation (Finalized) ---
+
+Blood_data_clean <- Blood_data_clean %>%
+  # Create the numeric ESR column
+  mutate(esr_numeric = as.numeric(as.character(esr))) %>%
+  # Ensure 'Groupe' and 'week' are factors
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# Filter out NA ESR values AND groups/weeks that you know are incomplete
+Blood_data_esr_clean <- Blood_data_clean %>%
+  filter(!is.na(esr_numeric)) %>%
+  # Explicitly filter out the incomplete subgroups to balance the design
+  filter(!(Groupe == "Winter" & week == "4")) %>%
+  filter(!(Groupe == "Contrôle" & week == "4"))
+
+# --- 1. Run the Two-Way ANOVA ---
+
+# The formula checks for main effects of Groupe, week, and their interaction.
+anova_model <- aov(esr_numeric ~ Groupe * week, data = Blood_data_esr_clean)
+
+# --- 2. Display the ANOVA Summary Table ---
+
+# The summary shows the Sum of Squares, F-statistic, and p-value for each factor.
+summary(anova_model)
+```
+```{r}
+# Load the required package for Tukey's HSD
+# The 'TukeyHSD' function is part of the base 'stats' package, but we'll use 'aov' from 'stats'
+# We'll re-run the aov model here for completeness, though it uses the 'stats' package, not tidyverse.
+
+# --- Re-run the ANOVA Model (Ensure the model object is available) ---
+# Assuming Blood_data_esr_clean is the correct filtered dataset and the model was:
+# anova_model <- aov(esr_numeric ~ Groupe * week, data = Blood_data_esr_clean)
+
+# --- 1. Tukey's HSD for the 'Groupe' Factor ---
+# This compares the overall mean ESR of each group (Contrôle vs Summer, etc.)
+tukey_groupe <- TukeyHSD(anova_model, which = "Groupe")
+print("--- Tukey's HSD Results for GROUPE ---")
+print(tukey_groupe)
+
+# --- 2. Tukey's HSD for the 'week' Factor ---
+# This compares the overall mean ESR for each week (Week 4 vs 6, etc.)
+tukey_week <- TukeyHSD(anova_model, which = "week")
+print("\n--- Tukey's HSD Results for WEEK ---")
+print(tukey_week)
+```
+```{r}
+library(tidyverse)
+library(dplyr)
+
+# --- 0. Data Preparation (Filter for Summer) ---
+
+# Re-use the clean data, ensuring the 'esr_numeric' and 'week' columns are ready
+Blood_data_clean <- Blood_data_clean %>%
+  mutate(esr_numeric = as.numeric(as.character(esr))) %>%
+  mutate(week = factor(week)) 
+
+# Create a new dataset containing ONLY the Summer group with valid ESR data
+summer_data_clean <- Blood_data_clean %>%
+  filter(!is.na(esr_numeric)) %>%
+  filter(Groupe == "Summer")
+
+# --- 1. Run the One-Way ANOVA (Effect of 'week' on Summer Group) ---
+
+# The formula checks for the main effect of 'week' within the filtered data.
+anova_summer_model <- aov(esr_numeric ~ week, data = summer_data_clean)
+
+# --- 2. Display the ANOVA Summary Table ---
+
+summary(anova_summer_model)
+```
+```{r}
+# Only run this if the One-Way ANOVA p-value for 'week' is <= 0.05
+
+print("--- Post-hoc Tukey's HSD for Summer Group Weeks ---")
+TukeyHSD(anova_summer_model, which = "week")
+```
+```{r}
+# Ensure numeric column
+Blood_data_clean$esr <- as.numeric(Blood_data_clean$esr)
+
+# Calculate mean
+mean_esr <- aggregate(esr ~ Groupe + week, data = Blood_data_clean, FUN = mean)
+
+# Calculate SD
+sd_esr <- aggregate(esr ~ Groupe + week, data = Blood_data_clean, FUN = sd)
+
+# Combine into one summary dataframe
+ESR_summary <- merge(mean_esr, sd_esr, by = c("Groupe", "week"))
+colnames(ESR_summary) <- c("Groupe", "week", "mean_esr", "sd_esr")
+
+# Inspect
+print(ESR_summary)
+library(ggplot2)
+
+ggplot(ESR_summary, aes(x = factor(week), y = mean_esr, fill = Groupe)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = mean_esr - sd_esr, ymax = mean_esr + sd_esr),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  labs(title = "Mean ESR per Group Across Weeks",
+       x = "Week",
+       y = "ESR") +
+  theme_minimal()
+```
+```{r}
+library(dplyr)
+library(rstatix)
+
+# Filter for Summer only and weeks 4, 6, 8
+summer_data <- Blood_data_esr_clean %>%
+  filter(Groupe == "Summer", week %in% c("4", "6", "8"))
+
+# Kruskal-Wallis test across weeks
+kruskal_summer <- kruskal_test(summer_data, esr_numeric ~ week)
+print(kruskal_summer)
+
+# Post-hoc pairwise Wilcoxon tests between weeks
+pairwise_summer <- pairwise_wilcox_test(
+  summer_data,
+  esr_numeric ~ week,
+  p.adjust.method = "BH"
+)
+print(pairwise_summer)
+```
+
+```{r}
+week6_data <- Blood_data_esr_clean %>%
+  filter(week == "6")
+
+kruskal_week6 <- kruskal_test(week6_data, esr_numeric ~ Groupe)
+pairwise_week6 <- pairwise_wilcox_test(
+  week6_data,
+  esr_numeric ~ Groupe,
+  p.adjust.method = "BH"
+)
+
+print(kruskal_week6)
+print(pairwise_week6)
+
+# --- Compare groups at week 8 ---
+week8_data <- Blood_data_esr_clean %>%
+  filter(week == "8")
+
+kruskal_week8 <- kruskal_test(week8_data, esr_numeric ~ Groupe)
+pairwise_week8 <- pairwise_wilcox_test(
+  week8_data,
+  esr_numeric ~ Groupe,
+  p.adjust.method = "BH"
+)
+
+print(kruskal_week8)
+print(pairwise_week8)
+
+```
+
+```{r}
+library(lme4)
+library(dplyr)
+library(stats)
+
+# --- 0. Data Preparation ---
+
+# Assuming Blood_data_esr_clean is the cleaned data frame from the previous plot step.
+Blood_data_esr_clean <- Blood_data_esr_clean %>%
+  mutate(
+    # 1. Apply Rank Transformation
+    esr_rank = rank(esr_numeric), 
+    
+    # 2. Ensure factors are defined (essential for the model formula)
+    Groupe_factor = factor(Groupe, levels = c("Control", "Winter", "Summer")),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) # Assuming Shark_Id exists in the data
+  )
+
+# --- 1. Fit the Models (REML=FALSE) ---
+
+# Model B (Full): Includes Sex Factor
+model_esr_full <- lmer(
+  esr_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_data_esr_clean, 
+  REML = FALSE
+) 
+
+# Model A (Reduced): Excludes Sex Factor
+model_esr_reduced <- lmer(
+  esr_rank ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+  data = Blood_data_esr_clean, 
+  REML = FALSE
+)
+
+# --- 2. Compile and Print Results ---
+
+print("--- ESR (Rank) Model Comparison ---")
+
+results_esr <- data.frame(
+  Variable = "ESR",
+  Model = c("Full (with Sex)", "Reduced (without Sex)"),
+  AIC = c(AIC(model_esr_full), AIC(model_esr_reduced)),
+  BIC = c(BIC(model_esr_full), BIC(model_esr_reduced)),
+  LogLik = c(logLik(model_esr_full), logLik(model_esr_reduced)),
+  df = c(attr(logLik(model_esr_full), "df"), attr(logLik(model_esr_reduced), "df"))
+)
+
+print(results_esr)
+```
+```{r}
+library(dplyr)
+
+# Make sure 'esr' is numeric
+Blood_data_clean <- Blood_data_clean %>%
+  mutate(esr = as.numeric(as.character(esr)))
+
+# Mean ± SD of esr by Group
+esr_group_summary <- Blood_data_clean %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    mean = mean(esr, na.rm = TRUE),
+    sd   = sd(esr, na.rm = TRUE),
+    n    = n(),
+    .groups = "drop"
+  )
+
+esr_group_summary
+
+library(dplyr)
+
+# Summary for Summer group only, by week
+esr_summer_summary <- Blood_data_clean %>%
+  filter(Groupe == "Summer") %>%
+  group_by(week) %>%
+  summarise(
+    mean = mean(esr, na.rm = TRUE),
+    sd   = sd(esr, na.rm = TRUE),
+    n    = n(),
+    .groups = "drop"
+  )
+
+esr_summer_summary
+```
+
+```{r}
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+# ----------------------------
+# 0) Prepare data & factors
+# ----------------------------
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Static"
+
+Blood_data_clean <- Blood_count %>%
+  mutate(
+    week_factor = factor(week, levels = c("4", "6", "8")),
+    Groupe_factor = factor(Groupe, levels = c("Winter", "Static", "Summer")),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  ) %>%
+  filter(!is.na(esr))  # keep only ESR values
+
+Blood_data_clean <- Blood_data_clean %>%
+  mutate(esr = as.numeric(as.character(esr)))
+
+group_colors <- c("Winter" = "#FFF5E6", "Static" = "#FDB888", "Summer" = "#B30000")
+
+# ----------------------------
+# 1) Fit LMMs
+# ----------------------------
+model_esr_full <- lmer(
+  esr ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_data_clean,
+  REML = FALSE
+)
+
+model_esr_reduced <- lmer(
+  esr ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+  data = Blood_data_clean,
+  REML = FALSE
+)
+
+anova(model_esr_full, model_esr_reduced)
+
+# ----------------------------
+# 2) Pairwise comparisons (CLD letters)
+# ----------------------------
+emm_groups_week <- emmeans(model_esr_full, ~ Groupe_factor | week_factor)
+letters_week <- cld(emm_groups_week, Letters = letters, adjust = "tukey") %>%
+  as.data.frame() %>% mutate(.group = gsub(" ", "", .group))
+
+emm_weeks_group <- emmeans(model_esr_full, ~ week_factor | Groupe_factor)
+letters_weeks <- cld(emm_weeks_group, Letters = LETTERS, adjust = "tukey") %>%
+  as.data.frame() %>% mutate(.group = gsub(" ", "", .group))
+
+# ----------------------------
+# 3) Boxplot stats for positioning letters
+# ----------------------------
+box_stats <- Blood_data_clean %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    ymin   = min(esr, na.rm = TRUE),
+    lower  = quantile(esr, 0.25, na.rm = TRUE),
+    middle = median(esr, na.rm = TRUE),
+    upper  = quantile(esr, 0.75, na.rm = TRUE),
+    ymax   = max(esr, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+letters_week <- left_join(letters_week, box_stats, by = c("week_factor", "Groupe_factor")) %>%
+  mutate(
+    y_pos = ymax + 0.05*(ymax - ymin),
+    x_nudge = ifelse(Groupe_factor == "Summer" & week_factor == "4", -0.01, 0)
+  )
+
+letters_weeks <- left_join(letters_weeks, box_stats, by = c("week_factor", "Groupe_factor")) %>%
+  mutate(
+    y_pos = ymax + 0.17*(ymax - ymin),
+    x_nudge = ifelse(Groupe_factor == "Summer" & week_factor == "4", -0.01, 0)
+  )
+
+letters_week <- letters_week %>%
+  mutate(.group = .group)  # no change
+
+letters_weeks <- letters_weeks %>%
+  mutate(
+    .group = case_when(
+      Groupe_factor == "Summer" & week_factor == "4" ~ "A",
+      Groupe_factor == "Summer" & week_factor %in% c("6", "8") ~ "B",
+      TRUE ~ .group  # keep other letters unchanged
+    )
+  )
+
+# ----------------------------
+# 4) Plot ESR
+# ----------------------------
+p_esr <- ggplot(Blood_data_clean, aes(x = week_factor, y = esr, fill = Groupe_factor)) +
+  geom_boxplot(outlier.shape = NA, position = position_dodge(width = 0.75)) +
+  geom_point(aes(color = Groupe_factor),
+             shape = 21, size = 2, stroke = 0.5,
+             position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75),
+             alpha = 0.8) +
+  # lowercase letters
+  geom_text(data = letters_week,
+            aes(x = as.numeric(week_factor) + x_nudge, y = y_pos, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75),
+            vjust = 0, size = 6) +
+  # uppercase letters
+  geom_text(data = letters_weeks,
+            aes(x = as.numeric(week_factor) + x_nudge, y = y_pos, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75),
+            vjust = 0, size = 6, fontface = "bold") +
+  scale_fill_manual(values = group_colors) +
+  scale_color_manual(values = c("Winter"="black", "Static"="black", "Summer"="black"), guide = "none") +
+  labs(x = "", y = "ESR (mm/h)", fill = "Group") +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.title = element_text(size = 24),
+    axis.text.x = element_text(color = "black", size = 17),
+    axis.text.y = element_text(color = "black", size = 17),
+    axis.line = element_blank(),
+    legend.position = "right",
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
+    legend.title = element_text(size = 22),
+    legend.text = element_text(size = 20)
+  ) +
+  scale_x_discrete(labels = c("Week 4", "Week 6", "Week 8")) +
+  coord_cartesian(clip = "off")
+
+print(p_esr)
+
+# ----------------------------
+# 5) Export
+# ----------------------------
+ggsave("Figure_ESR.png", p_esr, width = 15, height = 12, dpi = 300)
+ggsave("Figure_ESR.pdf", p_esr, width = 15, height = 12)
+
+```
+
+
+
+
+
+
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(dplyr)
+library(stats)
+
+# --- 0. Data Preparation ---
+
+# Assuming Blood_data_esr_clean is the cleaned data frame.
+Blood_data_esr_clean <- Blood_data_esr_clean %>%
+  mutate(
+    # Ensure raw numeric variable and factors are defined
+    esr_numeric = as.numeric(as.character(esr)), 
+    Groupe_factor = factor(Groupe, levels = c("Control", "Winter", "Summer")),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) 
+  ) %>%
+  filter(!is.na(esr_numeric)) # Filter out NAs used in the plotting step
+
+# --- 1. Fit the LMM (REML=TRUE) ---
+
+# CRITICAL: Using the raw esr_numeric data as the outcome
+lmm_esr_raw <- lmer(
+  esr_numeric ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_data_esr_clean, 
+  REML = TRUE
+) 
+
+# --- 2. Print the Model Summary ---
+
+print("--- Summary of LMM for RAW ESR Data ---")
+summary(lmm_esr_raw)
+
+
+
+library(emmeans)
+library(DHARMa)
+library(writexl)
+library(dplyr)
+library(tidyr)
+library(emmeans)
+library(writexl)
+library(dplyr)
+library(tidyr)
+
+# --- 1. Post-hoc comparisons (Week vs. Week within Group) ---
+
+print("\n--- Post-hoc Week vs. Week Comparisons (Bonferroni-adjusted) ---")
+
+# Calculate EMMs for Week factor, conditioned by Group factor
+emms_esr_week_by_group <- emmeans(
+  lmm_esr_raw, 
+  specs = ~ week_factor | Groupe_factor
+)
+
+print(lmm_esr_raw)
+summary(lmm_esr_raw)
+anova(lmm_esr_raw)
+# Perform pairwise comparisons using Bonferroni adjustment
+pairs_esr_week_by_group <- pairs(
+  emms_esr_week_by_group, 
+  adjust = "bonferroni"
+) |> summary()
+
+# --- Convert to data frame and export ---
+pairs_esr_week_by_group_df <- as.data.frame(pairs_esr_week_by_group)
+
+# Clean up and select columns for export
+pairs_esr_week_by_group_df_export <- pairs_esr_week_by_group_df %>%
+  select(Groupe_factor, contrast, estimate, SE, df, t.ratio, p.value) %>%
+  rename(`P-Value` = p.value)
+
+print(pairs_esr_week_by_group_df_export)
+
+# --- 2. Export to Excel ---
+write_xlsx(pairs_esr_week_by_group_df_export, "ESR_Raw_Week_by_Week_Comparisons.xlsx")
+
+print("\nSuccessfully exported: ESR_Raw_Week_by_Week_Comparisons.xlsx")
+
+```
+```{r}
+
+```
+
