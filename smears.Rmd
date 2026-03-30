@@ -1,0 +1,842 @@
+
+---
+title: "wbc population"
+output: html_document
+date: "2025-11-13"
+---
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-11-10"
+---
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("smears_analysis_r.xlsx")
+```
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Lympho%` = `Lymoph%`
+  )
+
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `LG_ratio` = `L:G`
+  )
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    total_count        = `total count`
+  )
+```
+
+
+```{r, echo=FALSE}
+library(dplyr) # Make sure dplyr is loaded
+
+# Fix: Explicitly pass the data frame as the first argument to rename()
+Blood_count <- dplyr::rename(Blood_count, RBC_WBC = `rbc:wbc`)
+```
+```{r, echo=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+# --- 1. CLEAN AND PREPARE DATA USING BASE R ---
+# Force 'week' and 'Groupe' to be simple, clean vectors in the Blood_count frame.
+# This addresses the "unique() applies only to vectors" error by breaking any nested structure.
+
+# Convert necessary columns to character/numeric/factor explicitly
+Blood_count$RBC_WBC_clean <- as.numeric(as.character(Blood_count$RBC_WBC))
+Blood_count$week_clean <- as.numeric(as.character(Blood_count$week))
+Blood_count$Groupe_clean <- factor(as.character(Blood_count$Groupe))
+
+# Remove NA values for summarization
+Blood_count_no_na <- na.omit(Blood_count[, c("week_clean", "Groupe_clean", "RBC_WBC_clean")])
+
+# --- 2. SUMMARISE DATA (Using aggregate, a base R function) ---
+# Calculate the mean and standard deviation (sd) for plotting
+summary_data_rbcwbc <- aggregate(RBC_WBC_clean ~ week_clean + Groupe_clean, 
+                          data = Blood_count_no_na, 
+                          FUN = function(x) c(mean = mean(x), sd = sd(x)))
+
+# Flatten the aggregated output into a usable data frame for ggplot
+summary_data_rbcwbc <- data.frame(
+  week = summary_data_rbcwbc$week_clean,
+  Groupe = summary_data_rbcwbc$Groupe_clean,
+  mean_RBC_WBC = summary_data_rbcwbc$RBC_WBC_clean[, "mean"],
+  sd_RBC_WBC = summary_data_rbcwbc$RBC_WBC_clean[, "sd"]
+)
+
+# --- 3. CREATE PLOT ---
+# Use the cleaned columns directly for plotting
+grouped_barplot_rbcwbc <- ggplot(summary_data_rbcwbc, aes(x = factor(week), y = mean_RBC_WBC, fill = Groupe)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(aes(ymin = mean_RBC_WBC - sd_RBC_WBC, ymax = mean_RBC_WBC + sd_RBC_WBC),
+                position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+  labs(
+    title = "RBC:WBC ± SD",
+    x = "Week",
+    y = "Mean RBC:WBC",
+    fill = "Group"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+print(grouped_barplot_rbcwbc)
+```
+
+```{r}
+library(tidyverse)
+library(car)        # For Levene's Test
+library(lme4)
+library(lmerTest)   # For p-values in mixed models
+library(MuMIn)      # For R²
+library(DHARMa)     # For model diagnostics
+
+# Make sure your ratio column is numeric and factors are correctly set
+Blood_count <- Blood_count %>%
+  mutate(
+    RBC_WBC = as.numeric(RBC_WBC),     # rename if your column is `rbc:wbc`
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) # replace with your shark ID column name
+  )
+
+# ----- 📊 1. Levene’s Test (homogeneity of variance) -----
+leveneTest(RBC_WBC ~ Groupe_factor * week_factor, data = Blood_count)
+
+# ----- 🧪 2. Shapiro–Wilk Test (normality) -----
+# Test normality of the raw RBC:WBC values
+shapiro.test(Blood_count$RBC_WBC)
+
+# (Optional visualization)
+# ggplot(Blood_count, aes(sample = RBC_WBC)) + stat_qq() + stat_qq_line()
+
+# ----- 📈 3. Fit GLMM -----
+glmm_rbcwbc <- lmer(
+  RBC_WBC ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_count
+)
+
+# ----- 📄 4. Model Summary + R² -----
+summary(glmm_rbcwbc)
+r.squaredGLMM(glmm_rbcwbc)
+
+# ----- 🧩 5. Residual diagnostics -----
+simulation_output <- simulateResiduals(fittedModel = glmm_rbcwbc, n = 250)
+plot(simulation_output)
+
+```
+```{r}
+anova_rbcwbc <- aov(RBC_WBC ~ Groupe_factor * week_factor, data = Blood_count)
+
+# View the ANOVA table
+summary(anova_rbcwbc)
+
+# Optional: post-hoc pairwise comparisons if needed
+TukeyHSD(anova_rbcwbc)
+```
+
+```{r}
+library(tidyverse)
+
+# Pivot % columns into long format
+Blood_long_pct <- Blood_count %>%
+  pivot_longer(
+    cols = matches("%$"),
+    names_to = "Cell_var",
+    values_to = "Percent"
+  ) %>%
+  mutate(
+    week = factor(week, levels = sort(unique(week))),
+    Groupe = as.factor(Groupe)
+  )
+
+# Make a complete grid for all combinations
+Blood_summary <- Blood_long_pct %>%
+  group_by(Groupe, week, Cell_var) %>%
+  summarise(mean_value = mean(Percent, na.rm = TRUE), .groups = "drop") %>%
+  complete(Groupe, week, Cell_var)
+
+# Clean line plot
+ggplot(Blood_summary, aes(x = week, y = mean_value, color = Groupe, group = Groupe)) +
+  geom_line(size = 1) +
+  facet_wrap(~Cell_var, scales = "free_y", ncol = 3) +
+  labs(x = "Week", y = "Mean (%)", color = "Group") +
+  theme_bw(base_size = 13) +
+  theme(
+    strip.background = element_rect(fill = "grey90"),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+library(car)
+# Make sure Groupe and week are factors
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+# [Rbc]
+leveneTest(`[Rbc]` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`[Rbc]`))
+
+# [wbc]
+leveneTest(`[wbc]` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`[wbc]`))
+
+# [LG_ratio]
+leveneTest(`LG_ratio` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`LG_ratio`))
+
+# [LG_ratio_gt]
+leveneTest(`LG_ratio_gt` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`LG_ratio_gt`))
+
+# [Granulocyte]
+leveneTest(`[Granulocyte]` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`[Granulocyte]`))
+
+# [Thrombo]
+leveneTest(`[Thrombo]` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`[Thrombo]`))
+
+# [Lympho]
+leveneTest(`[Lympho]` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`[Lympho]`))
+
+# [GT]
+leveneTest(`[GT]` ~ Groupe * week, data = Blood_count)
+shapiro.test(na.omit(Blood_count$`[GT]`))
+
+```
+
+
+```{r, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Make sure factors are set
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# Pivot all the relevant columns into long format
+Blood_long <- Blood_count %>%
+  pivot_longer(
+    cols = c( `[Thrombo]`, `[Lympho]`, `[GT]`, `[CE]` , `[FE]`),
+    names_to = "Cell_var",
+    values_to = "Value"
+  )
+
+# Faceted boxplot with custom fill colors
+# Faceted boxplot with custom fill colors
+ggplot(Blood_long, aes(x = week, y = Value, fill = Groupe)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  scale_fill_manual(values = c("Summer" = "#D55E00", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  labs(x = "Week", y = "Value", fill = "Group") +
+  facet_wrap(~ Cell_var, scales = "free_y", ncol = 2) +
+  theme_minimal() +
+  theme(
+     theme(
+  strip.background = element_rect(
+    fill = "#E0E0E0",  # soft grey
+    color = "black",   # border color
+    size = 0.3,        # border thickness
+    linetype = "solid"
+  ),
+  strip.text = element_text(face = "bold", size = 12)
+  
+)
+)
+
+```
+```{r, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Make sure factors are set
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# Pivot all the relevant columns into long format
+Blood_long <- Blood_count %>%
+  pivot_longer(
+    cols = c(`[Rbc]`, `[wbc]`),
+    names_to = "Cell_var",
+    values_to = "Value"
+  )
+
+# Faceted boxplot with custom fill colors
+ggplot(Blood_long, aes(x = week, y = Value, fill = Groupe)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.7) +
+  scale_fill_manual(values = c("Summer" = "#D55E00", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  labs(x = "Week", y = "Value", fill = "Group") +
+  facet_wrap(~ Cell_var, scales = "free_y", ncol = 2) +
+  theme_minimal() +
+  theme(
+     theme(
+  strip.background = element_rect(
+    fill = "#E0E0E0",  # soft grey
+    color = "black",   # border color
+    size = 0.3,        # border thickness
+    linetype = "solid"
+  ),
+  strip.text = element_text(face = "bold", size = 12)
+  
+)
+)
+```
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Make sure factors are set
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# ---------------------------
+# 1️⃣ [Rbc]
+ggplot(Blood_count, aes(x = week, y = `[Rbc]`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "[Rbc] by Week and Group", x = "Week", y = "[Rbc]") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 2️⃣ [wbc]
+ggplot(Blood_count, aes(x = week, y = `[wbc]`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "[wbc] by Week and Group", x = "Week", y = "[wbc]") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 3️⃣ LG_ratio (no brackets)
+ggplot(Blood_count, aes(x = week, y = LG_ratio, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "LG_ratio by Week and Group", x = "Week", y = "LG_ratio") +
+  scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 5️⃣ [Granulocyte]
+ggplot(Blood_count, aes(x = week, y = `[Granulocyte]`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "[Granulocyte] by Week and Group", x = "Week", y = "[Granulocyte]") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 6️⃣ [Thrombo]
+ggplot(Blood_count, aes(x = week, y = `[Thrombo]`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "[Thrombo] by Week and Group", x = "Week", y = "[Thrombo]") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 7️⃣ [Lympho]
+ggplot(Blood_count, aes(x = week, y = `[Lympho]`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "[Lympho] by Week and Group", x = "Week", y = "[Lympho]") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 8️⃣ [GT]
+ggplot(Blood_count, aes(x = week, y = `[GT]`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "[GT] by Week and Group", x = "Week", y = "[GT]") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Make sure factors are set
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe = factor(Groupe),
+    week = factor(week)
+  )
+
+# ---------------------------
+# 1️⃣ Rbc%
+ggplot(Blood_count, aes(x = week, y = `Rbc%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "Rbc% by Week and Group", x = "Week", y = "Rbc%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+#lympho
+ggplot(Blood_count, aes(x = week, y = `Lympho%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "Lympho% by Week and Group", x = "Week", y = "Rbc%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 2️⃣ wbc%
+ggplot(Blood_count, aes(x = week, y = `wbc%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "wbc% by Week and Group", x = "Week", y = "wbc%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 3️⃣ thrombo%
+ggplot(Blood_count, aes(x = week, y = `Thrombo%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "thrombo% by Week and Group", x = "Week", y = "thrombo%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 4️⃣ GT%
+ggplot(Blood_count, aes(x = week, y = `GT%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "GT% by Week and Group", x = "Week", y = "GT%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 5️⃣ CE%
+ggplot(Blood_count, aes(x = week, y = `CE%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "CE% by Week and Group", x = "Week", y = "CE%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 6️⃣ FE%
+ggplot(Blood_count, aes(x = week, y = `FE%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "FE% by Week and Group", x = "Week", y = "FE%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 7️⃣ Neutro%
+ggplot(Blood_count, aes(x = week, y = `Neutro%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "Neutro% by Week and Group", x = "Week", y = "Neutro%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 8️⃣ Monocyte%
+ggplot(Blood_count, aes(x = week, y = `Monocyte%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "Monocyte% by Week and Group", x = "Week", y = "Monocyte%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 9️⃣ mitosis%
+ggplot(Blood_count, aes(x = week, y = `mitosis%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "mitosis% by Week and Group", x = "Week", y = "mitosis%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+# 10️⃣ immature%
+ggplot(Blood_count, aes(x = week, y = `immature%`, fill = Groupe)) +
+  geom_boxplot() +
+  labs(title = "immature% by Week and Group", x = "Week", y = "immature%") +
+   scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73" )) +
+  theme_minimal()
+
+```
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Filter for week 4
+Blood_week4 <- Blood_count %>%
+  filter(week == 4) %>%
+  select(Groupe, `Lympho%`, `Thrombo%`, `GT%`, `FE%`, `CE%`, `Neutro%`, `Monocyte%`, `Basophil%`)
+
+# Pivot longer
+Blood_long_week4 <- Blood_week4 %>%
+  pivot_longer(
+    cols = c(`Lympho%`, `Thrombo%`, `GT%`, `FE%`, `CE%`, `Neutro%`, `Monocyte%`, `Basophil%`),
+    names_to = "Cell_type",
+    values_to = "Percentage"
+  ) %>%
+  # Set the order of cell types
+  mutate(Cell_type = factor(Cell_type, levels = c(
+    "Lympho%", "Thrombo%", "GT%", "FE%", "CE%", "Neutro%", "Monocyte%", "Basophil%"
+  )))
+
+# Bar plot with dodged bars per cell type
+ggplot(Blood_long_week4, aes(x = Cell_type, y = Percentage, fill = Groupe)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73")) +
+  labs(title = "Week 4: Blood Cell Percentages by Group",
+       x = "Cell Type", y = "Percentage", fill = "Group") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+```
+```{r}
+# Filter for week 6
+Blood_week6 <- Blood_count %>%
+  filter(week == 6) %>%
+  select(Groupe, `Lympho%`, `Thrombo%`, `GT%`, `FE%`, `CE%`, `Neutro%`, `Monocyte%`, `Basophil%`)
+
+# Pivot longer and set order
+Blood_long_week6 <- Blood_week6 %>%
+  pivot_longer(
+    cols = c(`Lympho%`, `Thrombo%`, `GT%`, `FE%`, `CE%`, `Neutro%`, `Monocyte%`, `Basophil%`),
+    names_to = "Cell_type",
+    values_to = "Percentage"
+  ) %>%
+  mutate(Cell_type = factor(Cell_type, levels = c(
+    "Lympho%", "Thrombo%", "GT%", "FE%", "CE%", "Neutro%", "Monocyte%", "Basophil%"
+  )))
+
+# Plot
+ggplot(Blood_long_week6, aes(x = Cell_type, y = Percentage, fill = Groupe)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73")) +
+  labs(title = "Week 6: Blood Cell Percentages by Group",
+       x = "Cell Type", y = "Percentage", fill = "Group") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+```{r}
+
+```
+
+```{r}
+# Filter for week 8
+Blood_week8 <- Blood_count %>%
+  filter(week == 8) %>%
+  select(Groupe, `Lympho%`, `Thrombo%`, `GT%`, `FE%`, `CE%`, `Neutro%`, `Monocyte%`, `Basophil%`)
+
+# Pivot longer and set order
+Blood_long_week8 <- Blood_week8 %>%
+  pivot_longer(
+    cols = c(`Lympho%`, `Thrombo%`, `GT%`, `FE%`, `CE%`, `Neutro%`, `Monocyte%`, `Basophil%`),
+    names_to = "Cell_type",
+    values_to = "Percentage"
+  ) %>%
+  mutate(Cell_type = factor(Cell_type, levels = c(
+    "Lympho%", "Thrombo%", "GT%", "FE%", "CE%", "Neutro%", "Monocyte%", "Basophil%"
+  )))
+
+# Plot
+ggplot(Blood_long_week8, aes(x = Cell_type, y = Percentage, fill = Groupe)) +
+  geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+  scale_fill_manual(values = c("Summer" = "#D55", "Winter" = "#56B4E9", "Control" = "#009E73")) +
+  labs(title = "Week 8: Blood Cell Percentages by Group",
+       x = "Cell Type", y = "Percentage", fill = "Group") +
+  theme_minimal(base_size = 13) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+```{r}
+library(lme4)
+library(lmerTest)  # for p-values
+library(DHARMa)    # for residual diagnostics
+library(tidyverse)
+
+# Make sure factors are correct
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# -----------------------------
+# 1️⃣ GLMM for absolute WBC counts
+glmm_wbc <- lmer(`[wbc]` ~ Groupe_factor * week_factor+ (1 | Shark_Id_factor),
+                 data = Blood_count)
+
+summary(glmm_wbc)
+
+# Check residuals
+sim_wbc <- simulateResiduals(glmm_wbc, n = 250)
+plot(sim_wbc)
+testDispersion(sim_wbc)
+testQuantiles(sim_wbc)
+# Optional: testZeroInflation(sim_wbc)
+
+# Optional manual residual plots
+plot(fitted(glmm_wbc), resid(glmm_wbc))
+abline(h = 0, col = "red")
+qqnorm(resid(glmm_wbc)); qqline(resid(glmm_wbc))
+
+# -----------------------------
+# 2️⃣ GLMM for WBC percentages
+glmm_wbc_percent <- lmer(`wbc%` ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+                         data = Blood_count)
+
+summary(glmm_wbc_percent)
+
+# Check residuals
+sim_wbc_percent <- simulateResiduals(glmm_wbc_percent, n = 250)
+plot(sim_wbc_percent)
+testDispersion(sim_wbc_percent)
+testQuantiles(sim_wbc_percent)
+# Optional: testZeroInflation(sim_wbc_percent)
+
+# Optional manual residual plots
+plot(fitted(glmm_wbc_percent), resid(glmm_wbc_percent))
+abline(h = 0, col = "red")
+qqnorm(resid(glmm_wbc_percent)); qqline(resid(glmm_wbc_percent))
+```
+```{r}
+library(lme4)
+library(lmerTest)  # for p-values
+library(DHARMa)
+library(tidyverse)
+
+# Make sure factors are correct
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# -----------------------------
+# 1️⃣ GLMM for absolute Granulocyte counts
+glmm_granulo <- lmer(`[Granulocyte]` ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+                     data = Blood_count)
+
+summary(glmm_granulo)
+
+# Check residuals with DHARMa
+sim_granulo <- simulateResiduals(glmm_granulo, n = 250)
+plot(sim_granulo)
+testDispersion(sim_granulo)      # Over-/under-dispersion
+testZeroInflation(sim_granulo)   # Check for excess zeros
+testQuantiles(sim_granulo)       # Check quantile deviations
+
+# Optional manual residual plots
+plot(fitted(glmm_granulo), resid(glmm_granulo))
+abline(h=0, col="red")
+qqnorm(resid(glmm_granulo)); qqline(resid(glmm_granulo))
+
+# -----------------------------
+# 2️⃣ GLMM for Granulocyte percentages
+glmm_granulo_percent <- lmer(`granulocyte%` ~ Groupe_factor * week_factor + Sex + (1 | Shark_Id_factor),
+                             data = Blood_count)
+
+summary(glmm_granulo_percent)
+
+# Check residuals with DHARMa
+sim_granulo_percent <- simulateResiduals(glmm_granulo_percent, n = 250)
+plot(sim_granulo_percent)
+testDispersion(sim_granulo_percent)
+testQuantiles(sim_granulo_percent)
+# Percentages typically won't have zero-inflation, but can test if needed
+# testZeroInflation(sim_granulo_percent)
+
+# Optional manual residual plots
+plot(fitted(glmm_granulo_percent), resid(glmm_granulo_percent))
+abline(h=0, col="red")
+qqnorm(resid(glmm_granulo_percent)); qqline(resid(glmm_granulo_percent))
+
+```
+```{r}
+library(lme4)
+library(lmerTest) 
+library(tidyverse)
+
+
+# -----------------------------
+# 1️⃣ LMM for absolute Lymphocyte counts: `[Lympho]`
+# Note: Excluding Sex, mirroring your [wbc] and [Granulocyte] models.
+lmm_lympho <- lmer(`[Lympho]` ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+data = Blood_count)
+
+summary(lmm_lympho)
+
+# Check residuals with DHARMa
+sim_lympho <- simulateResiduals(lmm_lympho, n = 250)
+plot(sim_lympho)
+
+# DHARMa Tests
+cat("\n--- DHARMa Tests for [Lympho] ---\n")
+testDispersion(sim_lympho) 
+testZeroInflation(sim_lympho) 
+testQuantiles(sim_lympho) # Check quantile deviations (most important test)
+
+
+# -----------------------------
+# 2️⃣ LMM for Lymphocyte percentages: `lympho%`
+# Note: Including Sex_factor (assuming that is the correct column name for Sex in your data).
+lmm_lympho_percent <- lmer(`Lympho%` ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+data = Blood_count)
+
+summary(lmm_lympho_percent)
+
+# Check residuals with DHARMa
+sim_lympho_percent <- simulateResiduals(lmm_lympho_percent, n = 250)
+plot(sim_lympho_percent)
+
+# DHARMa Tests
+cat("\n--- DHARMa Tests for lympho% ---\n")
+testDispersion(sim_lympho_percent)
+testQuantiles(sim_lympho_percent)
+```
+
+```{r, error=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+# List of columns to plot
+cell_cols <- c("[Rbc]", "[wbc]", "[Lympho]", "[Thrombo]", "[GT]", "[CE]", "[FE]", "[Granulocyte]")
+
+# Loop to create plots for each column
+for (col in cell_cols) {
+  
+  # Wrap column name in backticks for aes_string
+  col_aes <- paste0("`", col, "`")
+  
+  p <- Blood_count %>%
+    ggplot(aes_string(x = "factor(week)", y = col_aes, fill = "Groupe")) +
+    geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8), color = "black") +
+     scale_fill_manual(values = c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")) +
+    geom_errorbar(stat = "summary", fun.data = mean_se, 
+                  position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+    labs(
+      title = paste0(col, " concentration ± SE"),
+      x = "Week",
+      y = paste0("Mean ", col),
+      fill = "Group"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 12)
+    )
+  
+  print(p)
+}
+
+
+```
+```{r, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+
+percent_cols <- c("Rbc%", "wbc%", "granulocyte%", "Lympho%", "Thrombo%", "GT%", "CE%", "FE%")
+
+for (col in percent_cols) {
+  
+  p <- Blood_count %>%
+    ggplot(aes(x = factor(week), y = .data[[col]], fill = Groupe)) +
+    geom_bar(stat = "summary", fun = mean, 
+             position = position_dodge(width = 0.8), color = "black") +
+     scale_fill_manual(values = c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")) +
+    geom_errorbar(stat = "summary", fun.data = mean_se, 
+                  position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+    labs(
+      title = paste0(col, " (%) ± SE"),
+      x = "Week",
+      y = paste0("Mean ", col),
+      fill = "Group"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      axis.title = element_text(size = 12),
+      legend.title = element_text(size = 12)
+    )
+  
+  print(p)
+}
+
+```
+
+
+
+```{r}
+library(lme4)
+library(lmerTest) 
+library(DHARMa)
+
+# Note: Ensure the RBC_WBC column exists in Blood_count
+
+# --- 1. LMM for RBC_WBC Ratio ---
+lmm_RBC_WBC_ratio <- lmer(RBC_WBC ~ Groupe_factor * week_factor + Sex +  (1 | Shark_Id_factor),
+                         data = Blood_count)
+
+summary(lmm_RBC_WBC_ratio)
+
+# --- 2. Check residuals with DHARMa ---
+sim_RBC_WBC <- simulateResiduals(lmm_RBC_WBC_ratio, n = 250)
+
+print("\n--- DHARMa Residual Plots and Tests for RBC_WBC Ratio ---")
+plot(sim_RBC_WBC)
+
+# DHARMa Tests
+testDispersion(sim_RBC_WBC)       # Over-/under-dispersion
+testQuantiles(sim_RBC_WBC)        # Check quantile deviations
+
+
+```
+
+
+
+

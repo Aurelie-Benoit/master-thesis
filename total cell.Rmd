@@ -1,0 +1,254 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-11-13"
+---
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("smears_analysis_r.xlsx")
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Lympho%` = `Lymoph%`
+  )
+
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+```{r}
+Blood_count <- Blood_count %>%
+  mutate(    
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id))
+```
+```{r}
+Blood_count <- Blood_count %>% 
+  filter(!is.na(Shark_Id))
+```
+
+```{r}
+library(dplyr)
+library(lme4)
+library(lmerTest)
+library(car)
+library(emmeans)
+library(ggplot2)
+
+# --- 1. Check variance and normality ---
+# Levene's Test
+leveneTest(total_cell ~ Groupe_factor * week_factor, data = Blood_count, center = "median")
+
+# Shapiro-Wilk Test
+shapiro.test(Blood_count$total_cell)
+```
+
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(writexl)
+library(DHARMa)
+library(cld)
+
+# --- 0. Fix group names and redefine factors ---
+
+# CRITICAL FIX 1: Change "Contrôle" to "Static" in the base column
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Static"
+
+# CRITICAL FIX 2: Explicitly define the factor levels with the new name and order
+Blood_count <- Blood_count %>%
+ mutate(
+ week_factor = factor(week),
+ # Redefine the factor using the corrected base column 'Groupe'
+ Groupe_factor = factor(
+        Groupe, 
+        levels = c("Static", "Summer", "Winter") # Ensure 'Static' is first
+    ),
+ Sex_factor = factor(Sex),
+Shark_Id_factor = factor(Shark_Id)
+)
+
+# --- 1. Fit LMM including Sex ---
+lmm_total <- lmer(total_cell ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+data = Blood_count)
+
+summary(lmm_total)
+
+# --- 2. Post-hoc comparisons: Groupe × Week ---
+emms_total <- emmeans(lmm_total, ~ Groupe_factor * week_factor)
+pairs_total <- pairs(emms_total, adjust = "tukey")
+
+# Convert to data frame, add direction and significance
+pairs_total_df <- as.data.frame(pairs_total) %>%
+ mutate(
+ Direction = ifelse(estimate > 0, "First > Second", "Second > First"),
+ Significance = ifelse(p.value < 0.05, "Yes", "No")
+ )
+
+# Export to Excel
+write_xlsx(pairs_total_df, "TotalCell_Pairwise_Comparisons.xlsx")
+
+# --- 3. Post-hoc comparisons: Sex within each Groupe × Week ---
+emms_sex <- emmeans(lmm_total, ~ Sex_factor | Groupe_factor * week_factor)
+pairs_sex <- pairs(emms_sex, adjust = "tukey")
+
+# Convert to data frame, add direction and significance
+pairs_sex_df <- as.data.frame(pairs_sex) %>%
+ mutate(
+ Direction = ifelse(estimate > 0, "Male > Female", "Female > Male"),
+ Significance = ifelse(p.value < 0.05, "Yes", "No")
+)
+
+# Export to Excel
+write_xlsx(pairs_sex_df, "TotalCell_Sex_Pairwise_Comparisons.xlsx")
+
+# --- 4. Plotting (Updated Colors) ---
+# CRITICAL FIX 3: Update custom_colors definition
+custom_colors <- c("Static" = "#D6C9AE", "Winter" = "#6F9FCC", "Summer" = "#D97A66")
+
+# CRITICAL FIX 4: Ensure emms_df (not defined in this block) is created
+# We'll create it here using the EMMs for plotting convenience
+emms_df <- as.data.frame(emms_total)
+
+
+p_total <- ggplot(emms_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+ geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+ geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+ width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+ scale_fill_manual(values = custom_colors) +
+ labs(
+ title = "",
+ x = "Week",
+ y = "Total cells count",
+ fill = ""
+ ) +
+ theme_minimal(base_size = 14) +
+theme(legend.position = "bottom")
+
+print(p_total)
+
+# --- 5. Overall Week Comparison ---
+emms_week_main <- emmeans(lmm_total, ~ week_factor)
+
+# 2. Perform pairwise comparisons on the marginal means
+pairs_week_main <- pairs(emms_week_main, adjust = "tukey")
+
+# 3. View the results (this is the "overall" test for Week)
+summary(pairs_week_main)
+```
+
+
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(Rmisc)
+
+# --- 0. Data Preparation ---
+
+# CRITICAL FIX 1: Ensure the base column 'Groupe' uses "Static" instead of "Contrôle"
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Static"
+
+Blood_count <- Blood_count %>%
+  mutate(
+    # Ensure factors are set to the desired order: Winter, Static, Summer
+    Groupe_factor = factor(Groupe, levels = c("Winter", "Static", "Summer")),
+    # Create the descriptive factor for weeks for better labels
+    week_label = factor(paste("Week", week), 
+                        levels = c("Week 4", "Week 6", "Week 8"))
+  )
+
+# Define the Antibody Color Palette (used for consistency)
+antibody_colors <- c(
+  "Static" = "#D6C9AE", 
+  "Winter"  = "#6F9FCC",
+  "Summer"  = "#D97A66" 
+)
+
+
+# --- 1. Summarize data: mean and SE per group and week ---
+data_summary <- Rmisc::summarySE(
+  Blood_count, 
+  measurevar = "total_cell", 
+  groupvars = c("Groupe_factor", "week_label")
+)
+
+# --- 2. Create the Final Bar Plot ---
+p_total_cell_bar <- ggplot(
+  data_summary, 
+  aes(x = Groupe_factor, y = total_cell, fill = Groupe_factor)
+) +
+  # Bars for means (CRITICAL FIX: Added black border for definition)
+  geom_bar(
+      stat = "identity", 
+      position = position_dodge(0.9), 
+      color = "black" # Ensures a black line around each bar
+    ) + 
+  
+  # Error bars for SE
+  geom_errorbar(
+    aes(ymin = total_cell - se, ymax = total_cell + se),
+    width = 0.2, 
+    position = position_dodge(0.9)
+  ) +
+  
+  # --- Facet by Descriptive Week Label, moved to the BOTTOM ---
+  facet_wrap(
+    ~ week_label, 
+    scales = "fixed", 
+    strip.position = "bottom"
+  ) +
+  
+  # Apply the Antibody Colors
+  scale_fill_manual(values = antibody_colors) +
+  
+  # Labels and Theme Adjustments
+  labs(
+    title = "", # Removed Plot Title
+    x = "", # Removed X-axis label
+    y = "Mean Total Cell Count (± SE)",
+    fill = "" # Removed Legend Title
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    # Remove the x-axis labels (Winter, Static, Summer) 
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    
+    # Adjust facet strip to be at the bottom and clean up background
+    strip.placement = "outside",
+    strip.background = element_blank(), 
+    strip.text = element_text(face = "bold", size = 12), 
+    
+    legend.position = "bottom",
+    panel.spacing = unit(0.5, "lines")
+  )
+
+print(p_total_cell_bar)
+```
+

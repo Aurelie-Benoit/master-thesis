@@ -1,0 +1,609 @@
+---
+title: "wbc population"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-11-13"
+---
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-11-10"
+---
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("smears_analysis_r_updated14.xlsx")
+```
+
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Lympho%` = `Lymoph%`
+  )
+
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+
+```{r}
+Blood_count <- Blood_count %>% 
+  filter(!is.na(Shark_Id))
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    total_count        = `total count`
+  )
+```
+
+
+```{r, echo=FALSE}
+library(dplyr) # Make sure dplyr is loaded
+
+# Fix: Explicitly pass the data frame as the first argument to rename()
+Blood_count <- dplyr::rename(Blood_count, RBC_WBC = `rbc:wbc`)
+```
+
+```{r, echo=FALSE, results='hide'}
+library(tidyverse)
+library(car)        # For Levene's Test
+library(lme4)
+library(lmerTest)   # For p-values in mixed models
+library(MuMIn)      # For R²
+library(DHARMa)     # For model diagnostics
+
+# Make sure your ratio column is numeric and factors are correctly set
+Blood_count <- Blood_count %>%
+  mutate(
+    RBC_WBC = as.numeric(RBC_WBC),     # rename if your column is `rbc:wbc`
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) # replace with your shark ID column name
+  )
+
+# ----- 📊 1. Levene’s Test (homogeneity of variance) -----
+leveneTest(RBC_WBC ~ Groupe_factor * week_factor, data = Blood_count)
+
+# ----- 🧪 2. Shapiro–Wilk Test (normality) -----
+# Test normality of the raw RBC:WBC values
+shapiro.test(Blood_count$RBC_WBC)
+```
+
+
+# shapiro and levene good
+
+
+
+```{r, echo=FALSE, results='hide'}
+library(lme4)
+library(lmerTest) 
+library(DHARMa)
+
+# Note: Ensure the RBC_WBC column exists in Blood_count
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+# --- 1. LMM for RBC_WBC Ratio ---
+lmm_RBC_WBC_ratio <- lmer(RBC_WBC ~ Groupe_factor * week_factor + Sex_factor +  (1 | Shark_Id_factor),
+                         data = Blood_count)
+
+summary(lmm_RBC_WBC_ratio)
+
+# --- 2. Check residuals with DHARMa ---
+sim_RBC_WBC <- simulateResiduals(lmm_RBC_WBC_ratio, n = 250)
+
+print("\n--- DHARMa Residual Plots and Tests for RBC_WBC Ratio ---")
+plot(sim_RBC_WBC)
+anova(lmm_RBC_WBC_ratio)
+# DHARMa Tests
+testDispersion(sim_RBC_WBC)       # Over-/under-dispersion
+testQuantiles(sim_RBC_WBC)        # Check quantile deviations
+library(emmeans)
+library(openxlsx)
+
+# --- Post-hoc comparisons ---
+emms_RBC_WBC <- emmeans(lmm_RBC_WBC_ratio, ~ Groupe_factor * week_factor)
+pairs_RBC_WBC <- pairs(emms_RBC_WBC, adjust = "tukey") |> summary()
+
+# --- Convert to data frame ---
+pairs_RBC_WBC_df <- as.data.frame(pairs_RBC_WBC)
+pairs_RBC_WBC_df <- pairs_RBC_WBC_df[, c("contrast", "estimate", "SE", "df", "t.ratio", "p.value")]
+
+# --- Export to Excel ---
+write.xlsx(pairs_RBC_WBC_df, file = "RBC_WBC_posthoc_pairs.xlsx", sheetName = "RBC_WBC_pairs", rowNames = FALSE)
+
+# --- Residual diagnostics already done with DHARMa ---
+# sim_RBC_WBC from your code can be plotted and tested
+plot(sim_RBC_WBC)
+testDispersion(sim_RBC_WBC)
+testQuantiles(sim_RBC_WBC)
+emms_week_main_rbcwbc <- emmeans(lmm_RBC_WBC_ratio, ~ week_factor)
+
+# --- 2. Perform Pairwise Comparisons on the Marginal Means ---
+# This tests the overall difference between the weeks (4 vs 6, 4 vs 8, 6 vs 8).
+pairs_week_main_rbcwbc <- pairs(emms_week_main_rbcwbc, adjust = "tukey")
+
+# --- 3. Display the Results ---
+
+# Summarize the pairwise comparisons
+pairs_summary_rbcwbc <- summary(pairs_week_main_rbcwbc)
+
+print("--- Overall Pairwise Comparisons for Week Factor (RBC/WBC Ratio) ---")
+print(pairs_summary_rbcwbc)
+```
+
+
+
+```{r}
+library(dplyr)
+
+Blood_count %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    mean_ratio = mean(RBC_WBC, na.rm = TRUE),
+    sd_ratio = sd(RBC_WBC, na.rm = TRUE),
+    n = n()
+  )
+```
+
+
+
+
+
+## GLR
+
+
+```{r, echo=FALSE, results='hide'}
+library(lme4)
+library(lmerTest)
+library(dplyr)
+library(car) 
+
+
+Blood_count <- Blood_count %>%
+  mutate(
+    GLR = `[Granulocyte]` / `[Lympho]`
+  )
+
+Blood_count <- Blood_count %>%
+  mutate(GroupWeek = interaction(Groupe_factor, week_factor))
+
+leveneTest(GLR ~ GroupWeek, data = Blood_count, center = median)
+shapiro.test(Blood_count$GLR)
+
+```
+
+
+
+
+```{r, echo=FALSE}
+# custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+# --- 0. Setup and Model Definition (As provided by user) ---
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+
+Blood_count <- Blood_count %>%
+  mutate(
+    GLR = `[Granulocyte]` / `[Lympho]`,
+    # Ensure factors are defined if they weren't in the provided block
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+
+
+# LMM fitted to GLR
+lmm_GLR <- lmer(GLR ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+                data = Blood_count)
+
+print("--- Summary of GLR LMM ---")
+summary(lmm_GLR)
+
+# --- 1. Diagnostics (As provided by user) ---
+library(DHARMa)
+
+print("\n--- DHARMa Residual Diagnostics for GLR LMM ---")
+res_total1 <- simulateResiduals(fittedModel = lmm_GLR, n = 1000)
+
+plot(res_total1)
+
+testUniformity(res_total1)
+testDispersion(res_total1)
+testZeroInflation(res_total1)
+library(emmeans)
+library(writexl)
+library(dplyr)
+
+
+
+print("--- GLR Post-hoc: Group vs. Group Comparisons (Within Weeks) ---")
+
+
+emms_glr_group_by_week <- emmeans(
+  lmm_GLR, 
+  specs = ~ Groupe_factor | week_factor
+)
+
+# 2. Perform pairwise comparisons using Tukey adjustment (suitable for comparing groups)
+pairs_glr_group_by_week <- pairs(
+  emms_glr_group_by_week, 
+  adjust = "tukey"
+) |> summary()
+anova(lmm_GLR)
+# --- Convert to data frame ---
+pairs_glr_df <- as.data.frame(pairs_glr_group_by_week)
+
+print(pairs_glr_df)
+
+# --- 3. Export to Excel ---
+write_xlsx(pairs_glr_df, "GLR_Group_by_Group_Comparisons.xlsx")
+
+print("\nSuccessfully exported: GLR_Group_by_Group_Comparisons.xlsx")
+```
+
+
+GLR includig GT =  lmer(GLR ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor)
+                                  Estimate Std. Error       df t value Pr(>|t|)    
+(Intercept)                       1.80054    0.10057 46.39577  17.904  < 2e-16 ***
+Groupe_factorSummer               0.05188    0.15094 50.47320   0.344  0.73248    
+Groupe_factorWinter              -0.11634    0.13222 50.52627  -0.880  0.38308    
+week_factor6                     -0.18080    0.12559 34.29794  -1.440  0.15905    
+week_factor8                     -0.36536    0.12559 34.29794  -2.909  0.00632 ** 
+Sex_factorMale                    0.02300    0.07409 16.39906   0.310  0.76018    
+Groupe_factorSummer:week_factor6  0.37054    0.20251 34.29794   1.830  0.07600 .  
+Groupe_factorWinter:week_factor6  0.31819    0.17761 34.29794   1.791  0.08205 .  
+Groupe_factorSummer:week_factor8  0.26531    0.21102 35.78229   1.257  0.21680    
+Groupe_factorWinter:week_factor8  0.36261    0.17761 34.29794   2.042  0.04895 *  
+```{r, echo=FALSE}
+# Plot
+p_glr_emmeans <- ggplot(emms_df, aes(x = week_factor, y = emmean, group = Groupe_factor, color = Groupe_factor)) +
+  geom_line(position = position_dodge(width = 0.5), linewidth = 1) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.15, position = position_dodge(width = 0.5), linewidth = 0.8) +
+  scale_color_manual(values = custom_colors) +
+  labs(
+    title = " GLR ratio with GT",
+    x = "Week",
+    y = "GLR (Granulocyte / Lymphocyte)",
+    color = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_glr_emmeans)
+
+library(openxlsx)  # for writing Excel files
+
+# --- Post-hoc comparisons for GLR ---
+pairs_GLR <- pairs(emms_GLR, adjust = "tukey") |> summary()
+
+# --- Convert to data frame ---
+pairs_GLR_df <- as.data.frame(pairs_GLR)
+
+# --- Optional: reorder/select columns ---
+pairs_GLR_df <- pairs_GLR_df[, c("contrast", "estimate", "SE", "df", "t.ratio", "p.value")]
+
+# --- Export to Excel ---
+write.xlsx(pairs_GLR_df, file = "GLR_posthoc_pairs.xlsx", sheetName = "GLR_pairs", rowNames = FALSE)
+
+```
+
+
+```{r echo=FALSE}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(openxlsx)
+library(DHARMa)
+library(dplyr)
+
+
+# --- 1. Prepare data ---
+Blood_count <- Blood_count %>%
+  mutate(
+    GLR1 = `[granulocyte_no_gt]` / `[Lympho]`,
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# --- 2. Fit LMM ---
+lmm_glr1 <- lmer(GLR1 ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+                 data = Blood_count)
+
+summary(lmm_glr1)
+
+# --- 3. Residual diagnostics ---
+res_glr1 <- simulateResiduals(lmm_glr1, n = 1000)
+plot(res_glr1)
+testUniformity(res_glr1)
+testDispersion(res_glr1)
+testZeroInflation(res_glr1)
+
+# --- 4. Marginal means for each group * week ---
+emms_glr1 <- emmeans(lmm_glr1, ~ Groupe_factor | week_factor)
+
+# --- 5. Post-hoc pairwise comparisons within each week ---
+
+library(openxlsx)  # for writing Excel files
+
+# --- Post-hoc comparisons for GLR ---
+# Calculate predicted marginal means for GLR1
+emms_glr1 <- emmeans(lmm_glr1, ~ Groupe_factor * week_factor)
+
+# Post-hoc pairwise comparisons (all pairs across groups and weeks)
+pairs_glr1 <- pairs(emms_glr1, adjust = "tukey") |> summary()
+
+# Convert to data frame
+pairs_glr1_df <- as.data.frame(pairs_glr1)
+
+# Optional: reorder columns
+pairs_glr1_df <- pairs_glr1_df[, c("contrast", "estimate", "SE", "df", "t.ratio", "p.value")]
+
+# Export to Excel
+write.xlsx(pairs_glr1_df, file = "GLR1_posthoc_pairs_GROUPS.xlsx", sheetName = "GLR1_pairs", rowNames = FALSE)
+
+```
+
+
+
+```{r, echo=FALSE}
+library(lme4)
+library(lmerTest)
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+
+# --- 3. Set custom colors for groups ---
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+# --- 4. Compute predicted marginal means ---
+emms_GLR1 <- emmeans(lmm_glr1, ~ Groupe_factor * week_factor)
+emms_df1 <- as.data.frame(emms_GLR1)
+
+# --- 5. Plot GLR over weeks for each group ---
+p_glr_emmeans1 <- ggplot(emms_df1, aes(x = week_factor, y = emmean, group = Groupe_factor, color = Groupe_factor)) +
+  geom_line(position = position_dodge(width = 0.5), linewidth = 1) +
+  geom_point(position = position_dodge(width = 0.5), size = 3) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.15, position = position_dodge(width = 0.5), linewidth = 0.8) +
+  scale_color_manual(values = custom_colors) +
+  labs(
+    title = "Granulocyte / Lymphocyte ratio without GT",
+    x = "Week",
+    y = "GLR",
+    color = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_glr_emmeans1)
+```
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# --- 0. Data Preparation and Factor Definition FIX ---
+
+# 1. CRITICAL FIX 1: Change the name in the base character column
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Static"
+
+Blood_count <- Blood_count %>%
+  mutate(
+    # Calculate Ratios (Assuming these column names are correct in your data)
+    GLR = `[Granulocyte]` / `[Lympho]`,
+    GLR1 = `[granulocyte_no_gt]` / `[Lympho]`,
+    
+    # Define factors for Sex and ID
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id),
+    
+    # 2. CRITICAL FIX 2: Define the plotting factor, enforcing Winter, Static, Summer order
+    Groupe_factor = factor(
+      Groupe, 
+      levels = c("Winter", "Static", "Summer") 
+    ),
+    
+    # 3. Create the descriptive factor for weeks
+    week_label = factor(
+      paste("Week", week), 
+      levels = c("Week 4", "Week 6", "Week 8")
+    )
+  )
+
+# Define the custom color palette (must be defined outside the pipeline)
+custom_colors <- c(
+  "Static" = "#D6C9AE", 
+  "Winter"  = "#6F9FCC",
+  "Summer"  = "#D97A66" 
+)
+
+
+# --- 1. Prep Data for Long Format and Filter GLR only ---
+glr_only <- Blood_count %>%
+  # Select only the GLR variable for plotting
+  select(Groupe_factor, week_label, GLR) %>% 
+  pivot_longer(
+    cols = c(GLR),
+    names_to = "Ratio_Type",
+    values_to = "Value"
+  )
+
+# --- 2. Create the Final Box Plot for GLR ---
+
+p_glr_only_final <- ggplot(
+  glr_only, 
+  aes(x = Groupe_factor, y = Value, fill = Groupe_factor)
+) +
+  # Create the box plot layer, showing outliers
+  geom_boxplot(
+    outlier.shape = 19, 
+    outlier.colour = "black", 
+    outlier.size = 2 
+  ) +
+  
+  # --- Facet by Week, with descriptive label, moved to the BOTTOM ---
+  facet_wrap(
+    ~ week_label, 
+    scales = "fixed", 
+    strip.position = "bottom" 
+  ) +
+  
+  # Apply the custom colors
+  scale_fill_manual(values = custom_colors) +
+  
+  # Labels and Theme Adjustments (Clean Aesthetics)
+  labs(
+    title = "", # Removed Plot Title
+    x = "", # Removed X-axis label
+    y = "GLR Value (Including GT)",
+    fill = "" # Removed Legend Title
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    # Remove X-axis text and ticks 
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    
+    # Adjust facet strip to be at the bottom and clean up background
+    strip.placement = "outside",
+    strip.background = element_blank(), 
+    strip.text = element_text(face = "bold", size = 12), 
+    
+    legend.position = "bottom",
+    panel.spacing = unit(0.5, "lines")
+  )
+
+print(p_glr_only_final)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# --- 0. Data Preparation and Factor Definition FIX ---
+
+# CRITICAL FIX 1: Change the name in the base character column
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Static"
+
+Blood_count <- Blood_count %>%
+  mutate(
+    # Calculate Ratios (Assuming these column names are correct in your data)
+    GLR = `[Granulocyte]` / `[Lympho]`,
+    GLR1 = `[granulocyte_no_gt]` / `[Lympho]`,
+    
+    # Define factors using the corrected 'Groupe' name
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id),
+    
+    # 2. Set the final desired plotting factor order: Winter, Static, Summer
+    Groupe_factor = factor(
+      Groupe, 
+      levels = c("Winter", "Static", "Summer") 
+    ),
+    
+    # 3. Create the descriptive factor for weeks
+    week_label = factor(
+      paste("Week", week), 
+      levels = c("Week 4", "Week 6", "Week 8")
+    )
+  )
+
+# Define the Antibody Color Palette (used for consistency)
+custom_colors <- c(
+  "Static" = "#D6C9AE", 
+  "Winter"  = "#6F9FCC",
+  "Summer"  = "#D97A66" 
+)
+
+
+# --- 1. Prep Data for Long Format and Filter GLR1 ---
+glr1_only <- Blood_count %>%
+  select(Groupe_factor, week_label, GLR1) %>% 
+  pivot_longer(
+    cols = c(GLR1),
+    names_to = "Ratio_Type",
+    values_to = "Value"
+  )
+
+# --- 2. Create the Final Box Plot for GLR1 ---
+
+p_glr1_final_dot <- ggplot(
+  glr1_only, 
+  aes(x = Groupe_factor, y = Value, fill = Groupe_factor)
+) +
+  # Create the box plot layer, showing outliers as solid black dots
+  geom_boxplot(
+    outlier.shape = 19, 
+    outlier.colour = "black", 
+    outlier.size = 2 
+  ) +
+  
+  # --- Facet by Week, with descriptive label, moved to the BOTTOM ---
+  facet_wrap(
+    ~ week_label, 
+    scales = "fixed", 
+    strip.position = "bottom" 
+  ) +
+  
+  # Apply the custom colors
+  scale_fill_manual(values = custom_colors) +
+  
+  # Labels and Theme Adjustments
+  labs(
+    title = "", # Removed Plot Title
+    x = "", # Removed X-axis label
+    y = "GLR1 Value (No GT)",
+    fill = "" # Removed Legend Title
+  ) +
+  
+  theme_minimal(base_size = 14) +
+  theme(
+    # Remove X-axis text and ticks 
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    
+    # Adjust facet strip to be at the bottom and clean up background
+    strip.placement = "outside",
+    strip.background = element_blank(), 
+    strip.text = element_text(face = "bold", size = 12), 
+    
+    legend.position = "bottom",
+    panel.spacing = unit(0.5, "lines")
+  )
+
+print(p_glr1_final_dot)
+```
+
+
+Glr signifcant lower for summer and control, signidcantd ecrease week 6 and 8. glr tend to increqse at week 8 for winter. no difference amoung sex

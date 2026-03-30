@@ -1,0 +1,1329 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-11-24"
+---
+
+
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+library(lmerTest)
+library(lme4)
+library(DHARMa)
+Blood_count <- read_excel("smears_analysis_r_updated14.xlsx")
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+```
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+
+```{r}
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    total_count        = `total count`
+  )
+```
+
+```{r}
+library(dplyr) # Make sure dplyr is loaded
+
+# Fix: Explicitly pass the data frame as the first argument to rename()
+Blood_count <- dplyr::rename(Blood_count, RBC_WBC = `rbc:wbc`)
+```
+
+
+```{r}
+Blood_count <- Blood_count %>% 
+  filter(!is.na(Shark_Id))
+```
+
+
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    Lympho_wbc    = `Lympho_wbc%`,
+    GT_wbc        = `GT_wbc%`,
+    FE_wbc        = `FE_wbc%`,
+    CE_wbc        = `CE_wbc%`,
+    Neutro_wbc    = `Neutro_wbc%`,
+    Monocyte_wbc  = `Monocyte_wbc%`,
+    Basophil_wbc  = `basophil_wbc%`
+  )
+
+```
+
+```{r}
+library(dplyr)
+
+# Summary of WBC counts by group, across all weeks
+wbc_group_summary <- Blood_count %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    Lympho_wbc_mean = mean(Lympho_wbc, na.rm = TRUE),
+    Lympho_wbc_sd   = sd(Lympho_wbc, na.rm = TRUE),
+    GT_wbc_mean     = mean(GT_wbc, na.rm = TRUE),
+    GT_wbc_sd       = sd(GT_wbc, na.rm = TRUE),
+    FE_wbc_mean     = mean(FE_wbc, na.rm = TRUE),
+    FE_wbc_sd       = sd(FE_wbc, na.rm = TRUE),
+    CE_wbc_mean     = mean(CE_wbc, na.rm = TRUE),
+    CE_wbc_sd       = sd(CE_wbc, na.rm = TRUE),
+    Neutro_wbc_mean = mean(Neutro_wbc, na.rm = TRUE),
+    Neutro_wbc_sd   = sd(Neutro_wbc, na.rm = TRUE),
+    Monocyte_wbc_mean = mean(Monocyte_wbc, na.rm = TRUE),
+    Monocyte_wbc_sd   = sd(Monocyte_wbc, na.rm = TRUE),
+    Basophil_wbc_mean = mean(Basophil_wbc, na.rm = TRUE),
+    Basophil_wbc_sd   = sd(Basophil_wbc, na.rm = TRUE),
+    .groups = "drop"
+  )
+wbc_group_summary
+week8_means <- Blood_count %>%
+    filter(week_factor == 8) %>%
+    group_by(Groupe_factor) %>%
+    summarise(mean_neutro = mean(Neutro_wbc, na.rm = TRUE),
+               sd(Neutro_wbc, na.rm = TRUE)
+              
+              )
+
+week8_means
+```
+
+
+
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(emmeans)
+library(multcomp)
+library(lme4)
+
+# ----------------------------
+# 0) Prepare factors + colors (same as your code)
+# ----------------------------
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe, levels = c("Winter", "Static", "Summer")),
+    week_factor  = factor(week, levels = c("4", "6", "8")),
+    Shark_Id_factor = factor(Shark_Id),
+    Sex_factor = factor(Sex)
+  )
+group_colors <- c("Winter" = "#FFF5E6", "Static" = "#FDB888", "Summer" = "#B30000")
+
+# ----------------------------
+# 1) Fit LMM
+# ----------------------------
+lmm_RBCWBC <- lmer(RBC_WBC ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id), data = Blood_count)
+
+# ----------------------------
+# 2) Letters for groups within week (lowercase)
+# ----------------------------
+emm_groups_week <- emmeans(lmm_RBCWBC, ~ Groupe_factor | week_factor)
+letters_week <- cld(emm_groups_week, Letters = letters, adjust = "tukey") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+# ----------------------------
+# 3) Compute pairwise contrasts for weeks within group (for brackets)
+# ----------------------------
+emm_weeks_group <- emmeans(lmm_RBCWBC, pairwise ~ week_factor | Groupe_factor, adjust = "tukey")
+pw_weeks <- summary(emm_weeks_group$contrasts)
+
+# Add significance stars
+pw_weeks <- pw_weeks %>%
+  mutate(signif = case_when(
+    p.value < 0.0001 ~ "****",
+    p.value < 0.001  ~ "***",
+    p.value < 0.01   ~ "**",
+    p.value < 0.05   ~ "*",
+    TRUE             ~ "n.s."
+  ))
+
+# Keep only positive estimates (optional)
+pw_weeks <- pw_weeks %>% filter(estimate > 0)
+
+# Separate week names
+pw_weeks <- pw_weeks %>%
+  separate(contrast, into = c("week1","week2"), sep = " - ") %>%
+  mutate(
+    week1 = factor(week1, levels = c("4","6","8")),
+    week2 = factor(week2, levels = c("4","6","8")),
+    Groupe_factor = factor(Groupe_factor, levels = c("Winter","Static","Summer"))
+  )
+
+# ----------------------------
+# 4) Compute boxplot stats for letter + bracket positions
+# ----------------------------
+box_stats <- Blood_count %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    ymin = min(RBC_WBC, na.rm = TRUE),
+    ymax = max(RBC_WBC, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Add letter positions
+letters_week <- left_join(letters_week, box_stats, by = c("week_factor","Groupe_factor")) %>%
+  mutate(y_pos = ymax + 0.05*(ymax - ymin))
+
+# Compute bracket positions
+dodge_width <- 0.75
+group_levels <- levels(Blood_count$Groupe_factor)
+n_groups <- length(group_levels)
+
+brackets_weeks_pos <- pw_weeks %>%
+  left_join(box_stats, by = c("week1"="week_factor", "Groupe_factor")) %>%
+  mutate(
+    x_start_num = as.numeric(week1) - dodge_width/2 + (match(Groupe_factor, group_levels)-0.5)*(dodge_width/n_groups),
+    x_end_num   = as.numeric(week2) - dodge_width/2 + (match(Groupe_factor, group_levels)-0.5)*(dodge_width/n_groups),
+    x_mid_num   = (x_start_num + x_end_num)/2,
+    y_pos       = ymax + 0.05*(ymax)  # slightly above top
+  )
+
+# ----------------------------
+# 5) Plot RBC/WBC with letters + brackets
+# ----------------------------
+p_RBCWBC <- ggplot(Blood_count, aes(x = week_factor, y = RBC_WBC, fill = Groupe_factor)) +
+  geom_boxplot(outlier.shape = NA, position = position_dodge(width = dodge_width)) +
+  geom_point(aes(color = Groupe_factor),
+             shape = 21, size = 2, stroke = 0.5,
+             position = position_jitterdodge(jitter.width = 0.1, dodge.width = dodge_width),
+             alpha = 0.8) +
+  geom_text(
+    data = letters_week,
+    aes(x = week_factor, y = y_pos, label = .group, group = Groupe_factor),
+    position = position_dodge(width = dodge_width),
+    vjust = 0, size = 6
+  ) +
+  # Brackets
+  geom_segment(data = brackets_weeks_pos,
+               aes(x = x_start_num, xend = x_end_num, y = y_pos, yend = y_pos),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_segment(data = brackets_weeks_pos,
+               aes(x = x_start_num, xend = x_start_num, y = y_pos, yend = y_pos-0.02),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_segment(data = brackets_weeks_pos,
+               aes(x = x_end_num, xend = x_end_num, y = y_pos, yend = y_pos-0.02),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_text(data = brackets_weeks_pos,
+            aes(x = x_mid_num, y = y_pos+0.02, label = signif),
+            inherit.aes = FALSE, size = 5) +
+  scale_fill_manual(values = group_colors) +
+  scale_color_manual(values = c("Winter"="black","Static"="black","Summer"="black"), guide="none") +
+  labs(x = "", y = "RBC/WBC Ratio", fill = "Group") +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.title = element_text(size = 16),
+    axis.text = element_text(color = "black", size = 14),
+    axis.line = element_line(color = "black", size = 0.8),
+    panel.grid = element_blank(),
+    legend.title = element_blank(),
+   legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3), 
+    legend.position = "right"
+  ) +
+  scale_x_discrete(labels = c("Week 4","Week 6","Week 8")) +
+  coord_cartesian(clip = "off")
+
+print(p_RBCWBC)
+
+
+```
+
+
+```{r}
+library(ggsignif)
+
+# ----------------------------
+# 1) Prepare single comparison table
+# ----------------------------
+sig_bracket <- data.frame(
+  week1 = "4",                   # week_factor for x-axis start
+  week2 = "8",                   # week_factor for x-axis end
+  Groupe_factor = "Static",      # group where comparison is done
+  y_position = max(Blood_count$RBC_WBC[Blood_count$Groupe_factor == "Static"], na.rm = TRUE) + 3.5, # adjust offset above box
+  annotations = "**"             # significance stars
+)
+
+# ----------------------------
+# 2) Plot with bracket
+# ----------------------------
+p_RBCWBC_png <- p_RBCWBC + 
+  geom_signif(
+    data = sig_bracket,
+    aes(xmin = week1, xmax = week2, annotations = annotations, y_position = y_position),
+    manual = TRUE,
+    tip_length = 0.03,
+     textsize = 6
+  )
+ggsave(
+  filename = "RBCWBC_bracket.png",
+  plot = p_RBCWBC_png,
+  width = 15,
+  height = 12,
+  dpi = 300
+)
+```
+
+
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(multcomp)
+library(emmeans)
+
+# ----------------------------
+# 0) Factors + Colors
+# ----------------------------
+
+Blood_count$Groupe_factor <- factor(
+  Blood_count$Groupe_factor,
+  levels = c("Winter", "Static", "Summer")
+)
+Blood_count <- Blood_count %>%
+  mutate(
+    GLR1 = `[granulocyte_no_gt]` / `[Lympho]`,
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+Blood_count$week_factor <- factor(
+  Blood_count$week_factor,
+  levels = c("4", "6", "8")
+)
+
+group_colors <- c("Winter" = "#FFF5E6", 
+                  "Static" = "#FDB888",
+                  "Summer" = "#B30000")
+
+
+box_stats <- Blood_count %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    ymax = max(GLR1, na.rm = TRUE),
+    .groups = "drop"
+  )
+# ----------------------------
+# 1) emmeans for groups within weeks (lowercase letters)
+# ----------------------------
+emm_groups_week <- emmeans(lmm_GLR, ~ Groupe_factor | week_factor)
+letters_week <- cld(emm_groups_week, Letters = letters, adjust = "tukey") %>%
+  as.data.frame() %>%
+  mutate(
+    .group = gsub(" ", "", .group)
+  ) %>%
+  left_join(
+    Blood_count %>% 
+      group_by(week_factor, Groupe_factor) %>%
+      summarise(y_max = max(GLR, na.rm = TRUE), .groups = "drop"),
+    by = c("week_factor", "Groupe_factor")
+  ) %>%
+  mutate(
+    y_pos = y_max + 0.02*diff(range(Blood_count$GLR, na.rm = TRUE))  # small offset
+  )
+
+# ----------------------------
+# 2) Capital letters (bold): Weeks within same group
+# ----------------------------
+emm_weeks_group <- emmeans(lmm_GLR, ~ week_factor | Groupe_factor)
+letters_weeks <- cld(emm_weeks_group, Letters = LETTERS, adjust = "tukey") %>%
+  as.data.frame() %>%
+  mutate(
+    .group = gsub(" ", "", .group)
+  ) %>%
+  left_join(
+    Blood_count %>% 
+      group_by(week_factor, Groupe_factor) %>%
+      summarise(y_max = max(GLR, na.rm = TRUE), .groups = "drop"),
+    by = c("week_factor", "Groupe_factor")
+  ) %>%
+  mutate(
+    y_pos = y_max + 0.08*diff(range(Blood_count$GLR, na.rm = TRUE))  # slightly higher offset
+  )
+
+# ----------------------------
+# 3) Flatten y-axis range a bit
+# ----------------------------
+y_min <- min(Blood_count$GLR, na.rm = TRUE)
+y_max <- max(Blood_count$GLR, na.rm = TRUE)*1.1  # slightly compressed
+
+# ----------------------------
+# 4) GLR Plot
+# ----------------------------
+p_GLR <- ggplot(Blood_count, aes(x = week_factor, y = GLR, fill = Groupe_factor)) +
+  geom_boxplot(outlier.colour = "black",
+               outlier.shape = NA,
+               position = position_dodge(width = 0.75)) +
+  geom_point(aes(color = Groupe_factor),
+             shape = 21, size = 2, stroke = 0.5,
+             position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75),
+             alpha = 0.8) +
+  
+  # Lowercase letters for groups within week
+  geom_text(data = letters_week,
+            aes(x = week_factor, y = y_pos, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75),
+            vjust = -0.3, size = 4) +
+
+  
+  labs(y = "GLR", x = "Week", fill = "Group") +
+  scale_fill_manual(values = group_colors) +
+  scale_color_manual(values = c("Winter"="black","Static"="black","Summer"="black"), guide="none") +
+  theme_minimal(base_size = 15) +
+  theme(
+        axis.title = element_text(size = 14),
+        axis.text.x = element_text(color = "black", size = 12),
+        axis.text.y = element_text(color = "black", size = 12),
+        axis.line = element_line(color = "black"),
+        panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  
+        legend.position = "right",
+        legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
+        legend.key = element_rect(fill = NA, color = NA),
+        legend.title = element_blank(),
+        legend.text = element_text(size = 9),
+        plot.margin = margin(t = 5.5, r = 5.5, b = 5.5, l = 5.5, unit = "pt")) +
+  coord_cartesian(ylim = c(y_min, y_max), clip = "off")
+
+print(p_GLR)
+
+
+```
+```{r}
+library(ggsignif)
+
+# ----------------------------
+# 1) Prepare single comparison table
+# ----------------------------
+sig_bracket2 <- data.frame(
+  week1 = "4",                   # week_factor for x-axis start
+  week2 = "8",                   # week_factor for x-axis end
+  Groupe_factor = "Static",      # group where comparison is done
+  y_position = max(Blood_count$GLR1[Blood_count$Groupe_factor == "Static"], na.rm = TRUE) + 0.20, # adjust offset above box
+  annotations = "***"             # significance stars
+)
+
+# ----------------------------
+# 2) Plot with bracket
+# ----------------------------
+p_GLR1_png <- p_GLR1 + 
+  geom_signif(
+    data = sig_bracket2,
+    aes(xmin = week1, xmax = week2, annotations = annotations, y_position = y_position),
+    manual = TRUE,
+    tip_length = 0.03,
+     textsize = 6
+  )
+ggsave(
+  filename = "GLR1_bracket.png",
+  plot = p_GLR1_png,
+  width = 15,
+  height = 8,
+  dpi = 300
+)
+```
+
+
+```{r}
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(ggplot2)
+library(dplyr)
+
+# ----------------------------
+# 0) Prepare factors + colors
+# ----------------------------
+Blood_count <- Blood_count %>%
+  mutate(
+    GLR = `[Granulocyte]` / `[Lympho]`,  # replace with correct column names
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe_factor, levels = c("Winter", "Static", "Summer")),
+    week_factor  = factor(week_factor, levels = c("4", "6", "8"))
+  )
+
+
+group_colors <- c("Winter" = "#FFF5E6", 
+                  "Static" = "#FDB888",
+                  "Summer" = "#B30000")
+
+# ----------------------------
+# 1) Fit Linear Mixed Model
+# ----------------------------
+lmm_glr <- lmer(GLR ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id), 
+                data = Blood_count)
+print(lmm_glr)
+summary(lmm_glr)
+Anova(lmm_glr)
+# ----------------------------
+# 2) Pairwise comparisons
+# ----------------------------
+# 2a) Groups within week (lowercase letters)
+emm_groups_week <- emmeans(lmm_glr, ~ Groupe_factor | week_factor)
+
+letters_week <- cld(emm_groups_week, Letters = letters, adjust = "tukey", sort = TRUE) %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+
+# ----------------------------
+# 3) Compute boxplot stats for positioning letters
+# ----------------------------
+box_stats <- Blood_count %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    ymin   = min(GLR, na.rm = TRUE),
+    lower  = quantile(GLR, 0.25, na.rm = TRUE),
+    middle = median(GLR, na.rm = TRUE),
+    upper  = quantile(GLR, 0.75, na.rm = TRUE),
+    ymax   = max(GLR, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+letters_week <- left_join(letters_week, box_stats, by = c("week_factor", "Groupe_factor")) %>%
+  mutate(y_pos = ymax + 0.04*(ymax - ymin))  # 5% above top
+
+
+
+# ----------------------------
+# 5) Plot GLR
+# ----------------------------
+p_GLR <- ggplot(Blood_count, aes(x = week_factor, y = GLR, fill = Groupe_factor)) +
+  geom_boxplot(outlier.shape = NA, position = position_dodge(width = 0.75)) +
+  geom_point(aes(color = Groupe_factor),
+             shape = 21, size = 2, stroke = 0.5,
+             position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75),
+             alpha = 0.8) +
+  # Lowercase letters (groups within week)
+  geom_text(data = letters_week, 
+            aes(x = week_factor, y = y_pos, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75),
+            vjust = 0, size = 4) +
+
+  scale_fill_manual(values = group_colors) +
+  scale_color_manual(values = c("Winter"="black","Static"="black","Summer"="black"),
+                     guide = "none") +
+  labs(y = "GLR", x = "Week", fill = "Group") +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(color = "black", size = 12),
+    axis.text.y = element_text(color = "black", size = 12),
+    axis.line = element_line(color = "black"),
+    panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  
+    legend.position = "right",
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
+    legend.key = element_rect(fill = NA, color = NA),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    plot.margin = margin(t = 5.5, r = 5.5, b = 5.5, l = 5.5, unit = "pt")
+  )
+
+print(p_GLR)
+
+mean_glr <- Blood_count %>%
+  group_by(Groupe_factor, week_factor) %>%  # group by your factors
+  summarise(
+    mean_GLR = mean(GLR, na.rm = TRUE),     # calculate mean, ignoring NAs
+    sd_GLR   = sd(GLR, na.rm = TRUE),       # optional: standard deviation
+    n        = n()                          # optional: sample size
+  )
+
+# View results
+print(mean_glr)
+
+mean_glr_group <- Blood_count %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    mean_GLR = mean(GLR, na.rm = TRUE),
+    sd_GLR   = sd(GLR, na.rm = TRUE),
+    n        = n()
+  )
+
+print(mean_glr_group)
+```
+```{r}
+emmeans(lmm_GLR, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+```
+
+```{r}
+library(ggsignif)
+
+# ----------------------------
+# 1) Prepare single comparison table
+# ----------------------------
+sig_bracket1 <- data.frame(
+  week1 = "4",                   # week_factor for x-axis start
+  week2 = "8",                   # week_factor for x-axis end
+  Groupe_factor = "Winter",      # group where comparison is done
+  y_position = max(Blood_count$total_cell[Blood_count$Groupe_factor == "Winter"], na.rm = TRUE) + 3.5, # adjust offset above box
+  annotations = "***"             # significance stars
+)
+
+# ----------------------------
+# 2) Plot with bracket
+# ----------------------------
+p_total_cell_png <- p_total_cell + 
+  geom_signif(
+    data = sig_bracket1,
+    aes(xmin = week1, xmax = week2, annotations = annotations, y_position = y_position),
+    manual = TRUE,
+    tip_length = 0.03,
+    textsize = 6
+  )
+
+# ----------------------------
+# 3) Export PNG
+# ----------------------------
+ggsave(
+  filename = "Total_cells_Winter_bracket.png",
+  plot = p_total_cell_png,
+  width = 15,
+  height = 8,
+  dpi = 300
+)
+
+```
+
+```{r}
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(ggplot2)
+library(dplyr)
+Blood_count <- Blood_count %>%
+  mutate(
+    GLR1 = `[granulocyte_no_gt]` / `[Lympho]`,
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# ----------------------------
+# 0) Prepare factors + colors
+# ----------------------------
+Blood_count$Groupe_factor <- factor(Blood_count$Groupe_factor,
+                                    levels = c("Winter", "Static", "Summer"))
+Blood_count$week_factor <- factor(Blood_count$week_factor,
+                                  levels = c("4", "6", "8"))
+
+group_colors <- c("Winter" = "#FFF5E6", 
+                  "Static" = "#FDB888",
+                  "Summer" = "#B30000")
+
+# ----------------------------
+# 1) Fit Linear Mixed Model
+# ----------------------------
+# Random effect for shark id if needed
+lmm_glr1 <- lmer(GLR1 ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id), data = Blood_count)
+print(lmm_glr1)
+summary(lmm_glr1)
+anova(lmm_glr1)
+# ----------------------------
+# 2) Pairwise comparisons
+# ----------------------------
+# 2a) Groups within week (lowercase letters)
+emm_groups_week <- emmeans(lmm_glr1, ~ Groupe_factor | week_factor)
+letters_week <- cld(emm_groups_week, Letters = letters, adjust = "tukey") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+
+
+# ----------------------------
+# 3) Compute boxplot stats for positioning letters
+# ----------------------------
+box_stats <- Blood_count %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    ymin   = min(GLR1, na.rm = TRUE),
+    lower  = quantile(GLR1, 0.25, na.rm = TRUE),
+    middle = median(GLR1, na.rm = TRUE),
+    upper  = quantile(GLR1, 0.75, na.rm = TRUE),
+    ymax   = max(GLR1, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Merge CLDs with box stats
+letters_week <- left_join(letters_week, box_stats, by = c("week_factor", "Groupe_factor")) %>%
+  mutate(y_pos = ymax + 0.05*(ymax - ymin))  # 5% above top
+
+
+# ----------------------------
+# 4) Plot GLR1
+# ----------------------------
+p_GLR1 <- ggplot(Blood_count, aes(x = week_factor, y = GLR1, fill = Groupe_factor)) +
+  geom_boxplot(outlier.shape = NA, position = position_dodge(width = 0.75)) +
+  geom_point(aes(color = Groupe_factor),
+             shape = 21, size = 2, stroke = 0.5,
+             position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75),
+             alpha = 0.8) +
+  # Lowercase letters (groups within week)
+  geom_text(data = letters_week, 
+            aes(x = week_factor, y = y_pos, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75),
+            vjust = 0, size = 4) +
+
+  scale_fill_manual(values = group_colors) +
+  scale_color_manual(values = c("Winter"="black","Static"="black","Summer"="black"),
+                     guide = "none") +
+  labs(y = "GLR1", x = "Week", fill = "Group") +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text.x = element_text(color = "black", size = 12),
+    axis.text.y = element_text(color = "black", size = 12),
+    axis.line = element_line(color = "black"),
+    panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+    legend.position = "right",
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
+    legend.key = element_rect(fill = NA, color = NA),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 9),
+    plot.margin = margin(t = 5.5, r = 5.5, b = 5.5, l = 5.5, unit = "pt")
+  )
+
+print(p_GLR1)
+
+print(p_GLR)
+
+mean_glr1 <- Blood_count %>%
+  group_by(Groupe_factor, week_factor) %>%  # group by your factors
+  summarise(
+    mean_GLR1 = mean(GLR1, na.rm = TRUE),     # calculate mean, ignoring NAs
+    sd_GLR1   = sd(GLR1, na.rm = TRUE),       # optional: standard deviation
+    n        = n()                          # optional: sample size
+  )
+
+# View results
+print(mean_glr1)
+
+mean_glr1_group <- Blood_count %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    mean_GLR1 = mean(GLR1, na.rm = TRUE),
+    sd_GLR1   = sd(GLR1, na.rm = TRUE),
+    n        = n()
+  )
+
+print(mean_glr1_group)
+
+```
+
+
+
+```{r}
+library(patchwork)
+library(ggplot2)
+
+# Remove y-axis for GLR1
+p_GLR1_noy <- p_GLR1_png  + 
+  theme(
+    axis.title.y = element_blank(),  # remove y-axis labe  # remove y-axis text
+    axis.ticks.y = element_blank()   # remove y-axis ticks
+  )
+
+# Add identifiers
+p_GLR_labelled  <- p_GLR_png   + 
+  annotate("text", x = 0.5, y = max(Blood_count$GLR, na.rm = TRUE)*1.15, 
+           label = "A", fontface = "bold", size = 6, hjust = 0)
+
+p_GLR1_labelled <- p_GLR1_noy + 
+  annotate("text", x = 0.5, y = max(Blood_count$GLR1, na.rm = TRUE)*1.15, 
+           label = "B", fontface = "bold", size = 6, hjust = 0)
+
+# Combine side by side
+combined_plot <- p_GLR_labelled + p_GLR1_labelled +
+  plot_layout(ncol = 2, guides = "collect") &    # single legend
+  theme(legend.position = "right",
+         legend.title = element_blank())
+
+# Print
+print(combined_plot)
+
+# Export wider
+ggsave("combined_GLR_plot.png", combined_plot, width = 14, height = 6, dpi = 300)
+
+```
+
+
+```{r}
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+library(stringr)
+
+# ----------------------------
+# 0) Factors + Colors
+# ----------------------------
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe, levels = c("Winter", "Static", "Summer")),
+    week_factor  = factor(week, levels = c("4", "6", "8")),
+    Shark_Id_factor = factor(Shark_Id),
+    Sex_factor = factor(Sex)
+  )
+
+custom_colors <- c("Winter" = "#FFF5E6", 
+                   "Static" = "#FDB888", 
+                   "Summer" = "#B30000")
+
+# ----------------------------
+# Function to run LMM, emmeans, and compute letters
+# ----------------------------
+run_barplot_lmm <- function(response_var, y_label) {
+  
+  # Fit LMM
+  lmm <- lmer(as.formula(paste0(response_var, " ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id_factor)")),
+              data = Blood_count)
+  
+  # emmeans for groups within weeks (lowercase)
+  emm_groups <- emmeans(lmm, ~ Groupe_factor | week_factor)
+  letters_week <- cld(emm_groups, Letters = letters, adjust = "tukey") %>%
+    as.data.frame() %>%
+    mutate(.group = gsub(" ", "", .group))
+  
+  
+  # Box stats for bar positioning
+  emms_df <- as.data.frame(emmeans(lmm, ~ Groupe_factor * week_factor))
+  box_stats <- emms_df %>%
+    group_by(Groupe_factor, week_factor) %>%
+    summarise(y_max = max(emmean + SE), .groups = "drop")
+  
+  # Merge letters with stats
+  letters_week <- left_join(letters_week, box_stats, by = c("Groupe_factor", "week_factor")) %>%
+    mutate(y_pos = y_max + 0.02*max(y_max))  # small offset
+  
+   # higher offset for uppercase
+  
+  # Barplot
+  p <- ggplot(emms_df, aes(x = week_factor, y = emmean, fill = Groupe_factor)) +
+    geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+    geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                  width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+    geom_text(data = letters_week,
+              aes(x = week_factor, y = y_pos, label = .group, group = Groupe_factor),
+              position = position_dodge(width = 0.6),
+              vjust = 0, size = 6) +
+  scale_fill_manual(values = custom_colors) +
+  labs(x = "Week", y = y_label, fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+  
+  return(list(plot = p, model = lmm))
+}
+
+# ----------------------------
+# 1) Lymphocytes (%)
+# ----------------------------
+res_lympho <- run_barplot_lmm("Lympho_wbc", "Predicted % WBC")
+p_lympho <- res_lympho$plot
+lmm_lympho <- res_lympho$model
+summary (lmm_lympho)
+print (lmm_lympho)
+anova (lmm_lympho)
+# ----------------------------
+# 2) GT (%)
+# ----------------------------
+res_gt <- run_barplot_lmm("GT_wbc", "Predicted % WBC")
+p_gt <- res_gt$plot
+lmm_gt <- res_gt$model
+summary (lmm_gt)
+print(lmm_gt)
+anova (lmm_gt)
+
+# ----------------------------
+# 3) FE (%)
+# ----------------------------
+res_fe <- run_barplot_lmm("FE_wbc", "Predicted % WBC")
+p_fe <- res_fe$plot
+lmm_fe <- res_fe$model
+summary(lmm_fe)
+print (lmm_fe)
+anova(lmm_fe)
+
+
+lmm_fe <- res_fe$model
+summary(lmm_fe)
+print (lmm_fe)
+anova(lmm_fe)
+
+
+# ----------------------------
+# Optional: Combine plots using patchwork
+# ----------------------------
+```
+
+
+```{r}
+res_neutro <- run_barplot_lmm("Neutro_wbc", "Predicted % WBC")
+p_neutro <- res_neutro$plot
+lmm_neutro <- res_neutro$model
+
+res_monocyte<- run_barplot_lmm("mono_wbc", "Predicted % WBC")
+p_monocyte <- res_moncoyte$plot
+res_mono1 <- run_barplot_lmm("Monocyte_wbc", "Predicted % WBC")
+p_Monocyte1 <- res_monocyte$plot
+p_Monocyte1 <- p_Monocyte1 + 
+  theme(
+    axis.line = element_blank()  # removes numbers but keeps ticks
+  )
+lmm_monocyte1<- res_monocyte$model
+
+res_CE <- run_barplot_lmm("CE_wbc", "Predicted % WBC")
+p_CE <- res_CE$plot
+lmm_CE<- res_CE$model
+
+
+# Plot
+print(p_neutro)
+print(p_Monocyte1)
+print(p_CE)
+```
+
+
+
+
+```{r}
+res_total_cell <- run_barplot_lmm("total_cell", "Total blood cell count")
+p_total_cell <- res_total_cell$plot
+lmm_total_cell<- res_total_cell$model
+emms_total_cell <- emmeans(lmm_total_cell, specs = ~ week_factor | Groupe_factor)
+
+# Pairwise comparisons of weeks within each treatment group
+pairs_total_cell <- pairs(emms_total_cell , adjust = "tukey")
+print(pairs_total_cell)
+
+emms_total_cell_week_group <- emmeans(lmm_total_cell, specs  = ~ Groupe_factor | week_factor)
+
+overall_groups_total_cell<- pairs(emmeans(lmm_total_cell, ~ Groupe_factor), adjust = "tukey")
+overall_weeks_total_cell <- pairs(emmeans(lmm_total_cell, ~ week_factor), adjust = "tukey")
+overall_groups_total_cell
+overall_weeks_total_cell
+pairs_total_cell_week_group
+# Pairwise comparisons of groups within each level of week_factor (Tukey adjustment)
+pairs_total_cell_week_group <- pairs(emms_total_cell_week_group, adjust = "tukey")
+
+
+print (lmm_total_cell)
+summary(lmm_total_cell)
+anova(lmm_total_cell)
+p_Total_cell <- p_total_cell + 
+  theme(
+    axis.text.x = element_text(size = 22),   # increase X axis numbers
+    axis.text.y = element_text(size = 22),
+    axis.title.x = element_text(size = 26),   # X-axis title
+    axis.title.y = element_text(size = 26),  
+    legend.text = element_text(size = 26),
+    legend.title = element_blank(),
+      panel.grid.major = element_blank(),
+    legend.position = "right",
+    legend.background = element_rect(color = "black", fill = "white")
+  ) 
+
+ggsave(
+  filename = "Figure_total_cell.png",  # change filename as needed
+  plot = p_Total_cell,
+  width = 20,   # total width in inches
+  height = 20,  # total height in inches
+  dpi = 300     # high resolution
+)
+
+# Export as PDF
+ggsave(
+  filename = "Figure_total_cell.pdf",
+  plot = p_Total_cell,
+  width = 25,
+  height = 17
+)
+print(p_Total_cell)
+
+```
+
+
+
+
+
+```{r}
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(dplyr)
+library(ggplot2)
+
+# ----------------------------
+# 0) Prepare factors & rank variables
+# ----------------------------
+Blood_count <- Blood_count %>%
+  mutate(
+    week_factor = factor(week, levels = c("4","6","8")),
+    Groupe_factor = factor(Groupe, levels = c("Winter","Static","Summer")),
+    Shark_Id_factor = factor(Shark_Id),
+    Sex_factor = factor(Sex),
+    Monocyte_rank = rank(Monocyte_wbc),
+    CE_rank = rank(CE_wbc)
+  )
+
+group_colors <- c("Winter" = "#FFF5E6", "Static" = "#FDB888", "Summer" = "#B30000")
+
+# ----------------------------
+# 1) Fit LMM on ranks (for stats only)
+# ----------------------------
+lmm_monocyte_rank <- lmer(Monocyte_rank ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id_factor),
+                          data = Blood_count)
+lmm_ce_rank <- lmer(CE_rank ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id_factor),
+                    data = Blood_count)
+
+# ----------------------------
+# 2) EMMs and pairwise comparisons
+# ----------------------------
+# Monocyte
+emms_monocyte <- emmeans(lmm_monocyte_rank, ~ Groupe_factor | week_factor)
+letters_monocyte <- cld(emms_monocyte, Letters = letters, adjust = "bonferroni") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+emms_monocyte_weeks <- emmeans(lmm_monocyte_rank, ~ week_factor | Groupe_factor)
+letters_monocyte_upper <- cld(emms_monocyte_weeks, Letters = LETTERS, adjust = "bonferroni") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+# CE
+emms_ce <- emmeans(lmm_ce_rank, ~ Groupe_factor | week_factor)
+letters_ce <- cld(emms_ce, Letters = letters, adjust = "bonferroni") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+emms_ce_weeks <- emmeans(lmm_ce_rank, ~ week_factor | Groupe_factor)
+letters_ce_upper <- cld(emms_ce_weeks, Letters = LETTERS, adjust = "bonferroni") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+# ----------------------------
+# 3) Summary stats for barplots (RAW data)
+# ----------------------------
+df_monocyte <- Blood_count %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    mean = mean(Monocyte_wbc, na.rm = TRUE),
+    se = sd(Monocyte_wbc, na.rm = TRUE)/sqrt(n()),
+    ymax = max(Monocyte_wbc, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+df_ce <- Blood_count %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    mean = mean(CE_wbc, na.rm = TRUE),
+    se = sd(CE_wbc, na.rm = TRUE)/sqrt(n()),
+    ymax = max(CE_wbc, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ----------------------------
+# 4) Monocyte barplot
+# ----------------------------
+p_monocyte <- ggplot(df_monocyte, aes(x = week_factor, y = mean, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.75), color = "black") +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                width = 0.2, position = position_dodge(width = 0.75)) +
+  geom_text(data = letters_monocyte,
+            aes(x = week_factor, y = df_monocyte$ymax*1.05, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75), vjust = 1, hjust = 1, size = 4) +
+  scale_fill_manual(values = group_colors) +
+  labs(title = "Monocytes (%)", x = "Week") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title.y = element_blank(),
+    legend.position = c(0.85,0.85),
+    legend.background = element_rect(fill = "white", color = "black"),
+    legend.key = element_rect(fill = NA, color = NA)
+  )
+
+# ----------------------------
+# 5) CE barplot
+# ----------------------------
+p_ce <- ggplot(df_ce, aes(x = week_factor, y = mean, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.75), color = "black") +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                width = 0.2, position = position_dodge(width = 0.75)) +
+  geom_text(data = letters_ce,
+            aes(x = week_factor, y = df_ce$ymax*1.05, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.75), vjust = 1, hjust = 1, size = 4) +
+  scale_fill_manual(values = group_colors) +
+  labs(title = "CE (%)", x = "Week") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title.y = element_blank(),
+    legend.position = c(0.85,0.85),
+    legend.background = element_rect(fill = "white", color = "black"),
+    legend.key = element_rect(fill = NA, color = NA)
+  )
+
+print(p_monocyte)
+print(p_ce)
+
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(emmeans)
+library(lme4)
+library(stringr)
+
+custom_colors <- c("Winter" = "#FFF5E6", 
+                   "Static" = "#FDB888", 
+                   "Summer" = "#B30000")
+
+# raw data summary
+raw_summary <- Blood_count %>%
+  group_by(Groupe_factor, week_factor) %>%
+  summarise(
+    mean_val = mean(CE_wbc, na.rm = TRUE),   # replace CE_wbc with Monocyte_wbc for Monocyte
+    SE = sd(CE_wbc, na.rm = TRUE)/sqrt(n()),
+    max_val = max(CE_wbc, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# letters from EMMS (ranked model)
+letters_df <- cld(emms_ce_rank, Letters = letters, adjust = "bonferroni") %>%
+  as.data.frame() %>%
+  mutate(
+    Groupe_factor = factor(Groupe_factor, levels = c("Winter", "Static", "Summer")),
+    week_factor  = factor(week_factor, levels = c("4", "6", "8")),
+    .group = gsub(" ", "", .group)
+  )
+
+# merge letters with raw summary for y-position
+letters_df <- left_join(letters_df, raw_summary, by = c("Groupe_factor", "week_factor")) %>%
+  arrange(week_factor, Groupe_factor) %>%   # ensure logical order
+  mutate(
+    y_pos_lower = pmin(max_val + 0.05*max(max_val), 0.22),# lower letters capped at 0.20
+    y_pos_upper = pmin(max_val + 0.09*max(max_val), 0.28)   # upper letters capped at 0.25
+  )
+
+# Plot
+p_CE <- ggplot(raw_summary, aes(x = week_factor, y = mean_val, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = mean_val - SE, ymax = mean_val + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  # Lowercase letters
+  geom_text(data = letters_df,
+            aes(x = week_factor, y = y_pos_lower, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.6),
+            vjust = 1.7, size = 4) +
+  # Uppercase letters
+  geom_text(data = letters_df,
+            aes(x = week_factor, y = y_pos_upper, label = toupper(.group), group = Groupe_factor),
+            position = position_dodge(width = 0.6),
+            vjust = 1.5, size = 4, fontface = "bold") +
+  scale_fill_manual(values = custom_colors) +
+  labs(x = "Week", y = "Predicted % WBC", fill = "Group") +
+  annotate("text", x = 0.5, y = max(raw_summary$max_val)*1.15, label = "D", fontface = "bold", size = 6) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_CE)
+
+
+```
+```{r}
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(ggplot2)
+library(dplyr)
+library(ggpubr)
+library(stringr)
+
+# ----------------------------
+# 0) Factors + Colors
+# ----------------------------
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe, levels = c("Winter", "Static", "Summer")),
+    week_factor  = factor(week, levels = c("4", "6", "8")),
+    Shark_Id_factor = factor(Shark_Id),
+    Sex_factor = factor(Sex)
+  )
+
+custom_colors <- c("Winter" = "#FFF5E6", 
+                   "Static" = "#FDB888", 
+                   "Summer" = "#B30000")
+
+# ----------------------------
+# 1) Fit LMM on ranks (for stats only)
+# ----------------------------
+Blood_count$Monocyte_rank <- rank(Blood_count$Monocyte_wbc)
+
+lmm_monocyte_rank <- lmer(Monocyte_rank ~ Groupe_factor * week_factor + Sex_factor + (1|Shark_Id_factor),
+                          data = Blood_count)
+
+# Get emmeans for significance
+emms_monocyte_rank <- emmeans(lmm_monocyte_rank, specs = ~ week_factor | Groupe_factor)
+pairs_monocyte_rank <- pairs(emms_monocyte_rank, adjust = "bonferroni")
+
+# ----------------------------
+# 2) Prepare letters (from emmeans) for plotting
+# ----------------------------
+letters_week <- cld(emms_monocyte_rank, by = "week_factor", Letters = letters, adjust = "bonferroni") %>%
+  as.data.frame() %>%
+  mutate(.group = gsub(" ", "", .group))
+
+
+# ----------------------------
+# 3) Compute positions using raw data
+# ----------------------------
+raw_stats <- Blood_count %>%
+  group_by(Groupe_factor, week_factor) %>%
+  summarise(y_max = max(Monocyte_wbc, na.rm = TRUE),
+            y_min = min(Monocyte_wbc, na.rm = TRUE),
+            .groups = "drop")
+
+# LOWER-CASE LETTERS (groups within weeks)
+letters_week <- left_join(letters_week, raw_stats,
+                          by = c("Groupe_factor", "week_factor")) %>%
+  mutate(
+    y_pos = y_max + 0.005 * y_max,
+    y_pos = pmax(y_pos, 0.02),   # minimum = 0.02
+    y_pos = pmin(y_pos, 0.087)    # maximum = 0.08
+  )
+
+
+
+# ----------------------------
+# 4) Barplot on raw data
+# ----------------------------
+p_monocyte <- ggplot(Blood_count, aes(x = week_factor, y = Monocyte_wbc, fill = Groupe_factor)) +
+  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(stat = "summary", fun.data = "mean_se",
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  geom_text(data = letters_week,
+            aes(x = week_factor, y = y_pos, label = .group, group = Groupe_factor),
+            position = position_dodge(width = 0.6), vjust = 0, size = 4) +
+  scale_fill_manual(values = custom_colors) +
+  labs(x = "Week", y = "Monocyte (% WBC)", fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_monocyte)
+
+```
+
+
+```{r}
+library(patchwork)
+
+# Remove y-axis labels for right-column plots
+p_GT_noy <- p_gt + labs(y = NULL)
+p_CE_noy <- p_CE + labs(y = NULL)
+p_mono_noy1 <- p_Monocyte1 + labs(y = NULL)
+
+# Keep y-axis for left-column plots
+p_lympho_y <- p_lympho
+p_FE_y     <- p_fe
+p_neutro_y <- p_neutro
+
+
+library(ggplot2)
+library(patchwork)
+add_panel_letter <- function(p, letter){
+  p + annotate("text", x = -Inf, y = Inf, label = letter, 
+               hjust = -0.5, vjust = 1.5, size = 4, fontface = "bold")
+}
+
+# Apply to each plot
+p_lympho_y   <- add_panel_letter(p_lympho, "Lymphocyte")
+p_GT_noy     <- add_panel_letter(p_GT_noy, "G4")
+p_FE_y       <- add_panel_letter(p_FE_y, "FEG")
+p_CE_noy     <- add_panel_letter(p_CE_noy, "CEG")
+p_neutro_y   <- add_panel_letter(p_neutro_y, "Neutrophil")
+p_mono_noy1   <- add_panel_letter(p_mono_noy1, "Monocyte")
+
+p_GT_noy     <- p_GT_noy     + theme(legend.position = "none")
+p_CE_noy     <- p_CE_noy     + theme(legend.position = "none")
+p_mono_noy1   <- p_mono_noy1   + theme(legend.position = "none")
+p_FE_y       <- p_FE_y       + theme(legend.position = "none")
+p_neutro_y   <- p_neutro_y   + theme(legend.position = "none")
+
+# Keep legend only in p_lympho_y
+p_lympho_y   <- p_lympho_y   + theme(legend.position = "right",
+                                     legend.background = element_rect(color = "black", fill = "white"))
+
+# Combine
+combined_plot1 <- (p_lympho_y | p_GT_noy) /
+                 (p_FE_y     | p_CE_noy) /
+                 (p_neutro_y | p_mono_noy1) +
+                 plot_layout(guides = "collect")
+
+
+
+# Combine
+combined_plot1 <- (p_lympho_y | p_GT_noy) /
+                 (p_FE_y | p_CE_noy) /
+                 (p_neutro_y | p_mono_noy1) +
+                 plot_layout(guides = "collect") & 
+                 theme(legend.position = "right",
+                       legend.background = element_rect(color = "black", fill = "white"))
+
+print(combined_plot1)
+
+ggsave(
+  filename = "Figure_combined_WBC_FINAL.png",  # change filename as needed
+  plot = combined_plot1,
+  width = 14,   # total width in inches
+  height = 18,  # total height in inches
+  dpi = 300     # high resolution
+)
+
+# Export as PDF
+ggsave(
+  filename = "Figure_combined_WBC_FINAL.pdf",
+  plot = combined_plot1,
+  width = 14,
+  height = 18
+)
+```
+
+

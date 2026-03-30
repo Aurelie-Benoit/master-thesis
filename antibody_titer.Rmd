@@ -1,0 +1,731 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_datas <- read_excel("antibody_datas.xlsx")
+```
+
+
+
+```{r}
+Blood_datas <- Blood_datas %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+```{r}
+Blood_datas <- Blood_datas %>%
+  dplyr::rename(
+    esr        = `ESR (mm/h)`
+  )
+
+```
+
+
+```{r}
+Blood_datas <- Blood_datas %>% 
+  filter(!is.na(Shark_Id))
+
+```
+
+
+
+
+
+```{r}
+cat("Original rows:", nrow(Blood_datas), "\n")
+cat("Cleaned rows:", nrow(Blood_datas), "\n")
+head(Blood_data_clean)
+```
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+# Ensure Antibody_titer is numeric
+Blood_datas<- Blood_datas %>%
+  mutate(Antibody_titer = as.numeric(Antibody_titer))
+
+# Check for NAs after conversion (in case there were non-numeric values)
+sum(is.na(Blood_datas$Antibody_titer))
+
+# Calculate mean and SD per week
+summary_data <- Blood_datas %>%
+  group_by(week) %>%
+  summarise(
+    mean_titer = mean(Antibody_titer, na.rm = TRUE),
+    sd_titer = sd(Antibody_titer, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Create barplot with error bars
+barplot_Antibody_titer <- ggplot(summary_data, aes(x = factor(week), y = mean_titer)) +
+  geom_bar(stat = "identity", fill = "lightblue", color = "darkblue") +
+  geom_errorbar(aes(ymin = mean_titer - sd_titer, ymax = mean_titer + sd_titer), width = 0.2, color = "red") +
+  labs(
+    title = "Mean Antibody_titer by Week ± SD",
+    x = "Week Number",
+    y = "Mean Antibody Titer"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  )
+
+print(barplot_Antibody_titer)
+```
+
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+# Ensure Antibody_titer is numeric
+Blood_datas <- Blood_datas %>%
+  mutate(Antibody_titer = as.numeric(Antibody_titer))
+
+# Check for NAs after conversion
+sum(is.na(Blood_datas$Antibody_titer))
+
+# Calculate mean and SD per group
+summary_data <- Blood_datas %>%
+  group_by(Groupe) %>%
+  summarise(
+    mean_titer = mean(Antibody_titer, na.rm = TRUE),
+    sd_titer = sd(Antibody_titer, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Create barplot with error bars
+barplot_Antibody_titer <- ggplot(summary_data, aes(x = factor(Groupe), y = mean_titer)) +
+  geom_bar(stat = "identity", fill = "lightgreen", color = "darkgreen") +
+  geom_errorbar(aes(ymin = mean_titer - sd_titer, ymax = mean_titer + sd_titer), width = 0.2, color = "red") +
+  labs(
+    title = "Mean Antibody_titer by Group ± SD",
+    x = "Group",
+    y = "Mean Antibody Titer"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  )
+
+print(barplot_Antibody_titer)
+
+
+```
+
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+
+# Ensure Antibody_titer is numeric
+Blood_datas<- Blood_datas %>%
+  mutate(Antibody_titer = as.numeric(Antibody_titer))
+
+# Check for NAs after conversion
+sum(is.na(Blood_datas$Antibody_titer))
+
+# Calculate mean and SD per group per week
+summary_data <- Blood_datas %>%
+  group_by(week, Groupe) %>%
+  summarise(
+    mean_titer = mean(Antibody_titer, na.rm = TRUE),
+    sd_titer = sd(Antibody_titer, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Create grouped barplot with error bars
+grouped_barplot <- ggplot(summary_data, aes(x = factor(week), y = mean_titer, fill = Groupe)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(aes(ymin = mean_titer - sd_titer, ymax = mean_titer + sd_titer),
+                position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+  labs(
+    title = "Mean Antibody_titer by Week and Group ± SD",
+    x = "Week",
+    y = "Mean Antibody Titer",
+    fill = "Group"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+print(grouped_barplot)
+
+```
+
+```{r}
+Blood_data_clean %>%
+  summarise(shapiro_p = shapiro.test(Antibody_titer)$p.value)
+```
+```{r}
+library(car)
+
+# Levene's Test for homogeneity of variances across groups
+leveneTest(Antibody_titer ~ Groupe, data = Blood_data_clean)
+```
+
+```{r}
+library(ggplot2)
+ library(tidyverse)
+library(ggplot2)
+
+qq_plots_titer <- Blood_datas %>%
+  # Convert week to a factor for proper grouping
+  mutate(week_factor = factor(week)) %>%
+  
+  ggplot(aes(sample = Antibody_titer)) +
+  # Create a separate panel for every unique Groupe/week combination
+  facet_grid(Groupe ~ week_factor) +
+  # Add the plot points and the normality line
+  stat_qq() + 
+  stat_qq_line() +
+  labs(
+    title = "QQ Plots for Antibody_titer: Normality Check by Groupe and Week",
+    x = "Theoretical Quantiles (Normal Distribution)",
+    y = "Sample Quantiles (Antibody Titer, log2)"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12)
+  )
+
+print(qq_plots_titer)
+
+```
+
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(tidyverse)
+library(writexl)
+library(DHARMa)
+
+Blood_datas <- Blood_datas %>%
+  mutate(
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+Blood_datas$Groupe[Blood_datas$Groupe == "Contrôle"] <- "Control"
+
+lmm_Ab <- lmer(Antibody_titer ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+               data = Blood_datas)
+
+summary(lmm_Ab)
+
+# ----------------------------
+# 2. Residual diagnostics
+# ----------------------------
+res_Ab <- simulateResiduals(lmm_Ab, n = 1000)
+plot(res_Ab)
+testUniformity(res_Ab)
+testDispersion(res_Ab)
+testZeroInflation(res_Ab)
+
+# ----------------------------
+# 3. Post-hoc comparisons
+# ----------------------------
+emms_Ab <- emmeans(lmm_Ab, ~ Groupe_factor * week_factor)
+
+# Function to create Excel-friendly pairwise table
+prepare_emmeans_df <- function(emms_obj) {
+  df <- as.data.frame(pairs(emms_obj, adjust = "tukey"))
+  
+  df <- df %>%
+    separate(contrast, into = c("Group1", "Week1", "minus", "Group2", "Week2"), sep = " ") %>%
+    select(-minus) %>%
+    mutate(
+      Direction = ifelse(estimate > 0, "Group1 > Group2", "Group2 > Group1"),
+      Significant = ifelse(p.value < 0.05, "Yes", "No")
+    )
+  
+  return(df)
+}
+
+Ab_pairs_df <- prepare_emmeans_df(emms_Ab)
+
+# ----------------------------
+# 4. Export to Excel
+# ----------------------------
+write_xlsx(Ab_pairs_df, "Antibody_Pairwise.xlsx")
+```
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(tidyverse)
+library(writexl)
+library(DHARMa)
+
+# --- 0. Data Preparation and Rank Transformation ---
+
+# 1. Apply Rank Transformation to the zero-inflated variable
+# CRITICAL FIX: Create the rank column
+Blood_datas$Antibody_titer_rank <- rank(Blood_datas$Antibody_titer)
+
+# 2. Ensure factors are set
+Blood_datas <- Blood_datas %>%
+  mutate(
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# 3. Clean Group Name
+Blood_datas$Groupe[Blood_datas$Groupe == "Contrôle"] <- "Control"
+
+
+# --- 1. Fit the LMM to Rank-Transformed Data ---
+
+# CRITICAL FIX: Use the rank-transformed variable
+lmm_Ab_rank <- lmer(
+  Antibody_titer_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_datas
+)
+
+print("--- Summary of Rank-LMM for Antibody Titer ---")
+summary(lmm_Ab_rank)
+
+
+# ----------------------------
+# 2. Residual diagnostics
+# ----------------------------
+
+print("\n--- DHARMa Diagnostics for Rank-LMM ---")
+res_Ab_rank <- simulateResiduals(lmm_Ab_rank, n = 1000)
+
+# Plotting residuals (will open a separate plot window)
+plot(res_Ab_rank)
+
+testUniformity(res_Ab_rank)
+testDispersion(res_Ab_rank)
+testZeroInflation(res_Ab_rank)
+
+
+# ----------------------------
+# 3. Post-hoc comparisons (Tukey-adjusted)
+# ----------------------------
+
+# Use the rank model output
+emms_Ab_rank <- emmeans(lmm_Ab_rank, ~ Groupe_factor * week_factor)
+
+# Function to create Excel-friendly pairwise table (Modified for simplicity and clarity)
+prepare_emmeans_df <- function(emms_obj) {
+  df <- as.data.frame(pairs(emms_obj, adjust = "tukey"))
+  
+  # Select and rename columns for clarity
+  df <- df %>%
+    select(contrast, estimate, SE, df, t.ratio, p.value) %>%
+    rename(`P-Value` = p.value)
+  
+  return(df)
+}
+
+Ab_pairs_df <- prepare_emmeans_df(emms_Ab_rank)
+print("\n--- Post-hoc Pairwise Comparisons (Ranked Data) ---")
+print(Ab_pairs_df)
+
+# ----------------------------
+# 4. Export to Excel
+# ----------------------------
+# CRITICAL FIX: Update filename to reflect Rank-LMM
+write_xlsx(Ab_pairs_df, "Antibody_Titer_Rank_Pairwise.xlsx")
+
+print("\nSuccessfully exported: Antibody_Titer_Rank_Pairwise.xlsx")
+```
+
+
+```{r}
+library(tidyverse)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+
+# 1. Compute estimated marginal means (averaging over sex)
+Blood_datas$Groupe[Blood_datas$Groupe == "Contrôle"] <- "Control"
+
+Blood_datas <- Blood_datas %>%
+  mutate(Groupe_factor = factor(Groupe))
+
+
+emmeans_output <- emmeans(glmm_model, 
+                          ~ week_factor * Groupe_factor)
+
+# 2. Convert to data frame
+emmeans_df <- as.data.frame(summary(emmeans_output))
+emmeans_df$Groupe_factor <- emmeans_df$Groupe_factor %>%
+  fct_recode(Control = "Contrôle")
+
+line_plot <- ggplot(emmeans_df, aes(x = week_factor, y = emmean,
+                                    color = Groupe_factor, group = Groupe_factor)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE), width = 0.1) +
+  scale_color_manual(values = c(
+    "Control" = "#D6C9AE",
+    "Winter"  = "#6F9FCC",
+    "Summer"  = "#D97A66"
+  )) +
+  theme_bw()
+
+print(line_plot)
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr) # Already loaded if using the previous code blocks
+
+# --- 1. Data Preparation and Factor Setup ---
+
+Blood_datas <- Blood_datas %>%
+  mutate(
+    # Create the descriptive factor for weeks for better labels
+    week_label = factor(
+      paste("Week", week), 
+      levels = c("Week 4", "Week 6", "Week 8") # Ensure the order is correct
+    ),
+    Groupe_factor = factor(Groupe)
+  )
+
+# --- 2. Create the Final Box Plot ---
+
+p_Ab_final <- ggplot(
+  Blood_datas, 
+  aes(x = Groupe_factor, y = Antibody_titer, fill = Groupe_factor) # X-axis is now Group
+) +
+  # Use geom_boxplot
+  geom_boxplot(
+    outlier.shape = 19, # Use solid black dots for consistency
+    outlier.colour = "black", 
+    outlier.size = 2
+  ) +
+  
+  # --- Facet by Descriptive Week Label, moved to the BOTTOM ---
+  facet_wrap(
+    ~ week_label, 
+    scales = "fixed", 
+    strip.position = "bottom" # Moves the labels below the panels
+  ) +
+  
+  # Apply Custom Colors
+  scale_fill_manual(values = c(
+    "Control" = "#D6C9AE",
+    "Winter" = "#6F9FCC",
+    "Summer" = "#D97A66"
+  )) +
+  
+  # Labels and Theme Adjustments
+  labs(
+    title = "", # CRITICAL FIX: Removed Plot Title
+    x = "", # CRITICAL FIX: Removed X-axis label ("Week")
+    y = "Antibody Titer",
+    fill = "" # CRITICAL FIX: Removed Legend Title
+  ) +
+  
+  # Use a clean theme
+  theme_minimal(base_size = 14) +
+  theme(
+        # Remove the x-axis labels (Control, Summer, Winter) 
+        # as they are confusing since they repeat under each facet
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        
+        # Adjust facet strip to be at the bottom and clean up background
+        strip.placement = "outside",
+        strip.background = element_blank(), 
+        strip.text = element_text(face = "bold", size = 12), 
+        
+        legend.position = "bottom",
+        panel.spacing = unit(0.5, "lines"),
+        
+        # Center the overall plot (optional, but good practice)
+        plot.title = element_text(hjust = 0.5) 
+  )
+
+print(p_Ab_final)
+```
+
+
+
+
+```{r}
+library(tidyverse)
+library(rstatix)
+
+# Weeks to test
+weeks_to_test <- sort(unique(Blood_datas$week))
+
+# Prepare results storage
+kw_results <- tibble(
+  Week = integer(),
+  Statistic = double(),
+  df = double(),
+  p_value = double()
+)
+
+# Loop through weeks
+for(wk in weeks_to_test){
+  week_data <- Blood_datas %>% filter(week == wk)
+  
+  kw <- kruskal.test(Antibody_titer ~ Groupe, data = week_data)
+  
+  kw_results <- kw_results %>% 
+    add_row(
+      Week = wk,
+      Statistic = kw$statistic,
+      df = kw$parameter,
+      p_value = kw$p.value
+    )
+}
+
+# Print results
+kw_results
+
+# Optional: save to Excel
+write_xlsx(kw_results, "Kruskal_Antibody_Weekwise.xlsx")
+
+```
+```{r}
+library(tidyverse)
+library(rstatix)
+
+# Kruskal-Wallis test across all weeks
+kw_overall <- kruskal_test(Blood_datas, Antibody_titer ~ Groupe)
+kw_overall
+
+# Optional: post-hoc pairwise comparisons using Dunn test
+pairwise_dunn <- Blood_datas %>%
+  dunn_test(Antibody_titer ~ Groupe, p.adjust.method = "bonferroni")
+pairwise_dunn
+
+# Optional: save to Excel
+library(writexl)
+write_xlsx(list(
+  KW_Overall = kw_overall,
+  Pairwise_Dunn = pairwise_dunn
+), "Antibody_Overall_Groups.xlsx")
+
+```
+
+
+```{r}
+kruskal.test(Antibody_titer ~ Groupe, data = Blood_datas %>% filter(week == 4))
+kruskal.test(Antibody_titer ~ Groupe, data = Blood_datas %>% filter(week == 6))
+kruskal.test(Antibody_titer ~ Groupe, data = Blood_datas %>% filter(week == 8))
+```
+
+```{r}
+Blood_data_female <- Blood_data_clean %>%
+  filter(Sex_factor == "Female")
+```
+
+```{r}
+# Convert categorical variables to factors if not already
+ Blood_data_female <- Blood_data_female %>%
+  mutate(
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)  # replace with your shark ID column name
+  )
+
+# Fit the GLMM using lmer (treating log2 titers as continuous)
+glmm_model_1 <- lmer(
+  Antibody_titer ~ Groupe_factor * week_factor + eggs_presence+ (1 | Shark_Id_factor),
+  data = Blood_data_female
+)
+
+# View the model summary (lmerTest gives p-values)
+summary(glmm_model_1)
+
+# Calculate marginal and conditional R²
+r.squaredGLMM(glmm_model_1)
+
+# Simulate residuals using DHARMa
+simulation_output_1 <- simulateResiduals(fittedModel = glmm_model_1, n = 250)
+
+# Plot diagnostic checks (3 panels: uniformity, QQ, dispersion)
+plot(simulation_output_1)
+
+```
+```{r}
+library(openxlsx)
+
+# Create a data.frame with your fixed effects
+fixed_effects_table <- data.frame(
+  Effect = c("(Intercept)", "Groupe_factorSummer", "Groupe_factorWinter",
+             "week_factor6", "week_factor8", 
+             "Groupe_factorSummer:week_factor6", "Groupe_factorWinter:week_factor6",
+             "Groupe_factorSummer:week_factor8", "Groupe_factorWinter:week_factor8"),
+  Estimate = c(3.4119, -0.4873, 1.8231, 0.9981, 1.9972, -1.3331, -1.4435, -1.8913, -3.1025),
+  Std_Error = c(1.0598, 1.7089, 1.4988, 0.7012, 0.7012, 1.1307, 0.9917, 1.1916, 0.9917),
+  df = c(24.2561, 24.2561, 24.2561, 35.0401, 35.0401, 35.0401, 35.0401, 35.3267, 35.0401),
+  t_value = c(3.219, -0.285, 1.216, 1.423, 2.848, -1.179, -1.456, -1.587, -3.129),
+  P_value = c(0.00363, 0.77796, 0.23555, 0.16346, 0.00731, 0.24633, 0.15440, 0.12138, 0.00353)
+)
+
+# Export to Excel
+write.xlsx(fixed_effects_table, "Fixed_Effects_Table.xlsx", rowNames = FALSE)
+```
+
+
+```{r}
+library(dplyr)
+
+group_summary <- Blood_datas_clean %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    mean = mean(Antibody_titer, na.rm = TRUE),
+    sd   = sd(Antibody_titer, na.rm = TRUE),
+    n    = n(),
+    .groups = "drop"   # removes grouping after summarise
+  )
+
+group_summary
+
+# --- Mean ± SD by Group and Week ---
+group_week_summary <- Blood_datas_clean %>%
+  group_by(Groupe_factor, week_factor) %>%
+  summarise(
+    mean = mean(Antibody_titer, na.rm = TRUE),
+    sd   = sd(Antibody_titer, na.rm = TRUE),
+    n    = n(),
+    .groups = "drop"   # ensures the result is ungrouped
+  )
+
+group_week_summary
+```
+
+
+```{r}
+
+library(lme4)
+library(emmeans)
+library(multcomp)
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+# ----------------------------
+# 0) Prepare data & factors
+# ----------------------------
+Blood_datas_clean <- Blood_datas %>%
+  mutate(
+    Groupe = ifelse(Groupe == "Contrôle", "Control", Groupe),  # rename group for model
+    week_factor = factor(week, levels = c("4", "6", "8")),
+    Groupe_factor = factor(Groupe, levels = c("Winter", "Control", "Summer")),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+Blood_datas_clean <- Blood_datas_clean %>%
+  mutate(
+    Antibody_rank = rank(Antibody_titer, ties.method = "average")
+  )
+
+
+group_colors <- c("Winter" = "#FFF5E6", "Control" = "#FDB888", "Summer" = "#B30000")
+Blood_datas_clean <- Blood_datas_clean %>%
+  filter(Antibody_titer <= 10)
+# ----------------------------
+# 1) Fit LMM
+# ----------------------------
+lmm_Ab_rank <- lmer(
+  Antibody_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_datas_clean
+)
+# ----------------------------
+# 2) Pairwise comparisons (CLD letters)
+# ----------------------------
+
+summary(lmm_Ab_rank)
+print(lmm_Ab_rank)
+anova(lmm_Ab_rank)
+# ----------------------------
+# 3) Compute boxplot stats for positioning letters
+# ----------------------------
+box_stats_rank <- Blood_datas_clean %>%
+  group_by(week_factor, Groupe_factor) %>%
+  summarise(
+    ymin   = min(Antibody_titer, na.rm = TRUE),
+    lower  = quantile(Antibody_titer, 0.25, na.rm = TRUE),
+    middle = median(Antibody_titer, na.rm = TRUE),
+    upper  = quantile(Antibody_titer, 0.75, na.rm = TRUE),
+    ymax   = max(Antibody_titer, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# ----------------------------
+# 4) Plot Antibody titer
+# ----------------------------
+p_Ab_rank <- ggplot(Blood_datas_clean,
+                    aes(x = week_factor, y = Antibody_titer, fill = Groupe_factor)) +
+  geom_boxplot(outlier.shape = NA, position = position_dodge(width = 0.75)) +
+  geom_point(aes(color = Groupe_factor),
+             shape = 21, size = 2, stroke = 0.5,
+             position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75),
+             alpha = 0.8) +
+
+
+  scale_fill_manual(values = group_colors,
+                    labels = c("Winter" = "Winter",
+                               "Control" = "Static",
+                               "Summer" = "Summer")) +
+  scale_color_manual(values = c("Winter"="black",
+                                "Control"="black",
+                                "Summer"="black"),
+                     guide = "none") +
+  labs(x = "", y = "Antibody Titer", fill = "Group") +
+  theme_minimal(base_size = 15) +
+  theme(
+    axis.title = element_text(size = 24),
+    axis.text.x = element_text(color = "black", size = 14),
+    axis.text.y = element_text(color = "black", size = 14),
+     axis.line = element_line(color = "black"), # add axis lines
+    axis.ticks = element_line(color = "black"), # optional: ticks
+    legend.position = "right",
+    legend.title = element_blank(),
+    axis.line = element_line(color = "black"), # add axis lines
+    axis.ticks = element_line(color = "black"), # optional: ticks
+    legend.background = element_rect(fill = "white", color = "black", linewidth = 0.3),
+    legend.text = element_text(size = 22)
+  )+
+  annotate(
+    "text",                 # <--- specify type of annotation
+    x = Inf, y = Inf,       # top-right corner
+    label = "n.s.",          # <--- the text
+    hjust = 1.1, vjust = 1.1,
+    size = 10
+  ) +
+  scale_x_discrete(labels = c("Week 4", "Week 6", "Week 8")) +
+  coord_cartesian(clip = "off")
+
+print(p_Ab_rank)
+# ----------------------------
+# 5) Export
+# ----------------------------
+ggsave("Figure_antibody_final.png", p_Ab_rank, width = 15, height = 12, dpi = 300)
+ggsave("Figure_antibody_final.pdf", p_Ab_rank, width = 15, height = 12)
+
+
+```
+

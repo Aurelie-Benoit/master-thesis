@@ -1,0 +1,153 @@
+---
+title: "wbc population"
+output: html_document
+date: "2025-11-13"
+---
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-11-10"
+---
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("smears_analysis_r.xlsx")
+```
+
+```{r, echo=FALSE}
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Control"
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+
+```
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Granulo_no_Gt` = `Granulo-Gt`
+  )
+```
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Lympho%` = `Lymoph%`
+  )
+
+```
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `LG_ratio_gt` = `LG_ratio-gt`
+  )
+```
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `LG_ratio` = `L:G`
+  )
+```
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    total_count        = `total count`
+  )
+```
+
+
+```{r, echo=FALSE}
+library(dplyr) # Make sure dplyr is loaded
+
+# Fix: Explicitly pass the data frame as the first argument to rename()
+Blood_count <- dplyr::rename(Blood_count, RBC_WBC = `rbc:wbc`)
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(car)        # For Levene's Test
+library(lme4)
+library(lmerTest)   # For p-values in mixed models
+library(MuMIn)      # For R²
+library(DHARMa)     # For model diagnostics
+
+# Make sure your ratio column is numeric and factors are correctly set
+Blood_count <- Blood_count %>%
+  mutate(
+    RBC_WBC = as.numeric(RBC_WBC),     # rename if your column is `rbc:wbc`
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) # replace with your shark ID column name
+  )
+
+# ----- 📊 1. Levene’s Test (homogeneity of variance) -----
+leveneTest(RBC_WBC ~ Groupe_factor * week_factor, data = Blood_count)
+
+# ----- 🧪 2. Shapiro–Wilk Test (normality) -----
+# Test normality of the raw RBC:WBC values
+shapiro.test(Blood_count$RBC_WBC)
+```
+
+```{r}
+# Run two-way ANOVA
+anova_rbcwbc <- aov(RBC_WBC ~ Groupe_factor * week_factor, data = Blood_count)
+
+# View the ANOVA summary
+summary(anova_rbcwbc)
+
+# --- Post-hoc Test (Tukey HSD) ---
+TukeyHSD(anova_rbcwbc)
+
+```
+# group significant p = 1.5e-05*
+## winter vs controle + summer vs winter p<005
+
+# week no significant p = 0.351
+# group~week significant p = 0.0446*
+```{r}
+# --- Three-way ANOVA: Group × Week × Sex ---
+anova_group_week_sex <- aov(RBC_WBC ~ Groupe_factor * week_factor * Sex_factor,
+                            data = Blood_count)
+summary(anova_group_week_sex)
+
+```
+```{r}
+glmm_rbcwbc <- lmer(
+  RBC_WBC ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_count
+)
+
+# ----- 📄 4. Model Summary + R² -----
+summary(glmm_rbcwbc)
+r.squaredGLMM(glmm_rbcwbc)
+
+# ----- 🧩 5. Residual diagnostics -----
+simulation_output <- simulateResiduals(fittedModel = glmm_rbcwbc, n = 250)
+plot(simulation_output)
+
+```
+
+
+
+# conclusion = significant higher blood cells for summer and control. significant decrease at week 8. no significance between sex

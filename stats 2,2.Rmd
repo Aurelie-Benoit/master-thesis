@@ -1,0 +1,134 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-12-04"
+---
+```{r}
+## Load necessary packages
+library(dplyr)
+library(tidyr)
+
+# Create summary table
+summary_table <- Blood_count %>%
+  filter(week_factor %in% c(4,6,8)) %>%               # Only keep weeks 4, 6, 8
+  group_by(Groupe_factor, week_factor) %>%                    # Group by experimental group and week
+ summarise(
+    total_cell_mean = mean(total_cell, na.rm = TRUE),
+    total_cell_sd   = sd(total_cell, na.rm = TRUE),
+    RBC_WBC_mean    = mean(RBC_WBC, na.rm = TRUE),
+    RBC_WBC_sd      = sd(RBC_WBC, na.rm = TRUE),
+    GLR_mean        = mean(GLR, na.rm = TRUE),
+    GLR_sd          = sd(GLR, na.rm = TRUE),
+    GLR1_mean       = mean(GLR1, na.rm = TRUE),
+    GLR1_sd         = sd(GLR1, na.rm = TRUE),
+    Lympho_wbc_mean   = mean(Lympho_wbc, na.rm = TRUE),
+    Lympho_wbc_sd     = sd(Lympho_wbc, na.rm = TRUE),
+    GT_wbc_mean       = mean(GT_wbc, na.rm = TRUE),
+    GT_wbc_sd         = sd(GT_wbc, na.rm = TRUE),
+    FE_wbc_mean       = mean(FE_wbc, na.rm = TRUE),
+    FE_wbc_sd         = sd(FE_wbc, na.rm = TRUE),
+    CE_wbc_mean       = mean(CE_wbc, na.rm = TRUE),
+    CE_wbc_sd         = sd(CE_wbc, na.rm = TRUE),
+    Neutro_wbc_mean   = mean(Neutro_wbc, na.rm = TRUE),
+    Neutro_wbc_sd     = sd(Neutro_wbc, na.rm = TRUE),
+    Monocyte_wbc_mean = mean(Monocyte_wbc, na.rm = TRUE),
+    Monocyte_wbc_sd   = sd(Monocyte_wbc, na.rm = TRUE),
+    Basophil_wbc_mean = mean(Basophil_wbc, na.rm = TRUE),
+    Basophil_wbc_sd   = sd(Basophil_wbc, na.rm = TRUE),
+    .groups = "drop"
+) %>%
+  arrange(Groupe_factor, week_factor)
+
+# View summary table
+summary_table
+
+library(writexl)
+
+# Export to Excel
+write_xlsx(summary_table, path = "Blood_count_summary.xlsx")
+```
+```{r}
+emmeans(lmm_total, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_total, pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+emmeans(lmm_RBC_WBC_ratio, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_RBC_WBC_ratio, pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+var_name <- "[Rbc]"
+display_name <- "RBC count"  # clean name for plots/titles
+
+# --- Fit LMM ---
+lmm_rbc <- lmer(as.formula(paste0("`", var_name, "` ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor)")),
+                data = Blood_count)
+emmeans(lmm_rbc, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_rbc, pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+var_name <- "[wbc]"
+display_name <- "WBC count"  # clean name for plots/titles
+
+# --- Fit LMM ---
+lmm_WBC <- lmer(as.formula(paste0("`", var_name, "` ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor)")),
+                data = Blood_count)
+emmeans(lmm_WBC, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_WBC, pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+
+```{r}
+
+emmeans(lmm_thrombo, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_thrombo, pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+emmeans(lmm_Immature_rank, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_Immature_rank , pairwise ~ Groupe_factor | week_factor, adjust = "sidak") 
+```
+
+```{r}
+print(lmm_abnormal_rank)
+emmeans(lmm_abnormal_rank, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_abnormal_rank , pairwise ~ Groupe_factor | week_factor, adjust = "sidak") 
+```
+```{r}
+emmeans(lmm_GLR, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_GLR , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+emmeans(lmm_glr1, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_glr1 , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+emmeans(lmm_lympho, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_lympho , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+emmeans(lmm_gt, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_gt , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+```{r}
+emmeans(lmm_fe, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_fe , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+
+```{r}
+emmeans(lmm_ce_rank, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_ce_rank , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+
+```{r}
+emmeans(lmm_neutro, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_neutro , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+
+```{r}
+emmeans(lmm_monocyte_rank, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_monocyte_rank , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+
+```{r}
+emmeans(lmm_Ab_rank, pairwise ~ week_factor | Groupe_factor, adjust = "sidak")
+emmeans(lmm_Ab_ranl , pairwise ~ Groupe_factor | week_factor, adjust = "sidak")
+```
+

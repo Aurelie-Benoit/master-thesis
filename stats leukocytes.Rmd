@@ -1,0 +1,1265 @@
+---
+title: "wbc population"
+output: html_document
+date: "2025-11-13"
+---
+
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("smears_analysis_r_updated14.xlsx")
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    total_count        = `total count`
+  )
+```
+
+
+```{r}
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Shark_Id_factor = factor(Shark_Id),
+    Sex_factor = Sex
+    
+  )
+
+```
+```{r}
+Blood_count <- Blood_count %>% 
+  filter(!is.na(Shark_Id))
+```
+
+
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+
+# First, ensure columns are correctly renamed (if not already)
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    Lympho_wbc    = `Lympho_wbc%`,
+    GT_wbc        = `GT_wbc%`,
+    FE_wbc        = `FE_wbc%`,
+    CE_wbc        = `CE_wbc%`,
+    Neutro_wbc    = `Neutro_wbc%`,
+    Monocyte_wbc  = `Monocyte_wbc%`,
+    Basophil_wbc  = `basophil_wbc%`
+)
+```
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    abnormal       = `[abnormal]`
+  )
+
+```
+
+
+```{r}
+library(tidyverse)
+library(car) # for Levene’s test
+
+# --- 1. Filter only week 4 data ---
+week4_data <- Blood_count %>%
+  filter(week_factor == 4) %>%
+  dplyr::select(Groupe_factor, Lympho_wbc, GT_wbc, CE_wbc, FE_wbc, 
+                Neutro_wbc, Monocyte_wbc, Basophil_wbc)
+
+# --- 2. Loop and store results ---
+leuko_cols <- c("Lympho_wbc", "GT_wbc", "CE_wbc", "FE_wbc", 
+                "Neutro_wbc", "Monocyte_wbc", "Basophil_wbc")
+
+results_summary <- data.frame(
+  Variable = leuko_cols,
+  Levene_p = NA,
+  SW_Control_p = NA,
+  SW_Winter_p = NA,
+  SW_Summer_p = NA,
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(leuko_cols)) {
+  col <- leuko_cols[i]
+  
+  # Prepare data
+  temp <- week4_data %>%
+    dplyr::select(Groupe_factor, all_of(col)) %>%
+    drop_na()
+  
+  # --- Levene’s test for variance homogeneity ---
+  levene_result <- car::leveneTest(temp[[col]] ~ temp$Groupe_factor)
+  results_summary[i, "Levene_p"] <- levene_result$`Pr(>F)`[1]
+  
+  # --- Normality test for each group ---
+  shapiro_results <- by(temp[[col]], temp$Groupe_factor, shapiro.test)
+  
+  results_summary[i, "SW_Control_p"] <- shapiro_results$Control$p.value
+  results_summary[i, "SW_Winter_p"] <- shapiro_results$Winter$p.value
+  results_summary[i, "SW_Summer_p"] <- shapiro_results$Summer$p.value
+}
+
+# --- 3. Print the Summary Table ---
+print(results_summary)
+```
+
+```{r}
+library(tidyverse)
+library(car) # for Levene’s test
+week4_data <- Blood_count %>%
+  filter(week_factor == 6) %>%
+  dplyr::select(Groupe_factor, Lympho_wbc, GT_wbc, CE_wbc, FE_wbc, 
+                Neutro_wbc, Monocyte_wbc, Basophil_wbc)
+
+# --- 2. Loop and store results ---
+leuko_cols <- c("Lympho_wbc", "GT_wbc", "CE_wbc", "FE_wbc", 
+                "Neutro_wbc", "Monocyte_wbc", "Basophil_wbc")
+
+results_summary <- data.frame(
+  Variable = leuko_cols,
+  Levene_p = NA,
+  SW_Control_p = NA,
+  SW_Winter_p = NA,
+  SW_Summer_p = NA,
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(leuko_cols)) {
+  col <- leuko_cols[i]
+  
+  # Prepare data
+  temp <- week4_data %>%
+    dplyr::select(Groupe_factor, all_of(col)) %>%
+    drop_na()
+  
+  # --- Levene’s test for variance homogeneity ---
+  levene_result <- car::leveneTest(temp[[col]] ~ temp$Groupe_factor)
+  results_summary[i, "Levene_p"] <- levene_result$`Pr(>F)`[1]
+  
+  # --- Normality test for each group ---
+  shapiro_results <- by(temp[[col]], temp$Groupe_factor, shapiro.test)
+  
+  results_summary[i, "SW_Control_p"] <- shapiro_results$Control$p.value
+  results_summary[i, "SW_Winter_p"] <- shapiro_results$Winter$p.value
+  results_summary[i, "SW_Summer_p"] <- shapiro_results$Summer$p.value
+}
+
+# --- 3. Print the Summary Table ---
+print(results_summary)
+```
+
+
+```{r}
+library(tidyverse)
+library(car) # for Levene’s test
+
+week4_data <- Blood_count %>%
+  filter(week_factor == 8) %>%
+  dplyr::select(Groupe_factor, Lympho_wbc, GT_wbc, CE_wbc, FE_wbc, 
+                Neutro_wbc, Monocyte_wbc, Basophil_wbc)
+
+# --- 2. Loop and store results ---
+leuko_cols <- c("Lympho_wbc", "GT_wbc", "CE_wbc", "FE_wbc", 
+                "Neutro_wbc", "Monocyte_wbc", "Basophil_wbc")
+
+results_summary <- data.frame(
+  Variable = leuko_cols,
+  Levene_p = NA,
+  SW_Control_p = NA,
+  SW_Winter_p = NA,
+  SW_Summer_p = NA,
+  stringsAsFactors = FALSE
+)
+
+for (i in seq_along(leuko_cols)) {
+  col <- leuko_cols[i]
+  
+  # Prepare data
+  temp <- week4_data %>%
+    dplyr::select(Groupe_factor, all_of(col)) %>%
+    drop_na()
+  
+  # --- Levene’s test for variance homogeneity ---
+  levene_result <- car::leveneTest(temp[[col]] ~ temp$Groupe_factor)
+  results_summary[i, "Levene_p"] <- levene_result$`Pr(>F)`[1]
+  
+  # --- Normality test for each group ---
+  shapiro_results <- by(temp[[col]], temp$Groupe_factor, shapiro.test)
+  
+  results_summary[i, "SW_Control_p"] <- shapiro_results$Control$p.value
+  results_summary[i, "SW_Winter_p"] <- shapiro_results$Winter$p.value
+  results_summary[i, "SW_Summer_p"] <- shapiro_results$Summer$p.value
+}
+
+# --- 3. Print the Summary Table ---
+print(results_summary)
+```
+
+```{r}
+library(tidyverse)
+library(car)
+
+# Filter the data to include ONLY Week 4
+week4_data <- Blood_count %>%
+  filter(week_factor == 4) %>%
+  # Drop columns not needed for this simple ANOVA if they cause issues
+  dplyr::select(Groupe_factor, Monocyte_wbc) %>% 
+  drop_na()
+
+# --- Assumption Check Reminder ---
+# We run these to confirm Monocytes meet the requirements for ANOVA:
+
+# A. Homogeneity of Variances (Levene's Test)
+# P-value must be > 0.05
+levene_check <- car::leveneTest(Monocyte_wbc ~ Groupe_factor, data = week4_data)
+print("Levene's Test for Homogeneity of Variance:")
+print(levene_check)
+
+# B. Normality Check (Shapiro-Wilk for each group)
+# P-values must be > 0.05 for each group
+print("Shapiro-Wilk Normality Test by Group:")
+print(by(week4_data$Monocyte_wbc, week4_data$Groupe_factor, shapiro.test))
+
+# Only run this if the ANOVA P-value for Groupe_factor was < 0.05
+print("Tukey's HSD Post-Hoc Test:")
+TukeyHSD(monocyte_anova_wk4)
+```
+```{r}
+library(tidyverse)
+# Load rstatix for easy group-wise statistical testing
+# install.packages("rstatix")
+library(rstatix) 
+
+# --- Filter and select data ---
+analysis_data <- Blood_count %>%
+  dplyr::select(Groupe_factor, week_factor, Shark_Id, Monocyte_wbc) %>%
+  drop_na(Monocyte_wbc)
+
+# --- Run One-Way ANOVA on each Week separately ---
+anova_results <- analysis_data %>%
+  group_by(week_factor) %>%
+  anova_test(Monocyte_wbc ~ Groupe_factor) %>%
+  # Adjust P-values for the three tests (Wk4, Wk6, Wk8) using Bonferroni
+  adjust_pvalue(method = "bonferroni") %>% 
+  add_significance("p.adj")
+
+print("1. ANOVA (Treatment) Results for each Week:")
+print(anova_results)
+
+# --- Post-Hoc Test (if any ANOVA is significant, P.adj < 0.05) ---
+# If a specific week's ANOVA is significant, you must run Tukey's HSD:
+
+post_hoc_wk4 <- analysis_data %>%
+  filter(week_factor == 4) %>%
+  tukey_hsd(Monocyte_wbc ~ Groupe_factor) %>%
+  add_significance()
+
+print("2. Post-Hoc Tukey HSD for Week 4 (Run only if ANOVA was significant):")
+print(post_hoc_wk4)
+# Repeat for Week 6 and Week 8 if their respective ANOVAs were significant.
+```
+```{r}
+library(tidyverse)
+# Load rstatix for easy group-wise statistical testing
+# install.packages("rstatix")
+library(rstatix) 
+
+# --- Filter and select data ---
+analysis_data <- Blood_count %>%
+  dplyr::select(Groupe_factor, week_factor, Shark_Id, Monocyte_wbc) %>%
+  drop_na(Monocyte_wbc)
+
+# --- Run One-Way ANOVA on each Week separately ---
+anova_results <- analysis_data %>%
+  group_by(week_factor) %>%
+  anova_test(Monocyte_wbc ~ Groupe_factor) %>%
+  # Adjust P-values for the three tests (Wk4, Wk6, Wk8) using Bonferroni
+  adjust_pvalue(method = "bonferroni") %>% 
+  add_significance("p.adj")
+
+print("1. ANOVA (Treatment) Results for each Week:")
+print(anova_results)
+
+# --- Post-Hoc Test (if any ANOVA is significant, P.adj < 0.05) ---
+# If a specific week's ANOVA is significant, you must run Tukey's HSD:
+
+post_hoc_wk6 <- analysis_data %>%
+  filter(week_factor == 6) %>%
+  tukey_hsd(Monocyte_wbc ~ Groupe_factor) %>%
+  add_significance()
+
+print("2. Post-Hoc Tukey HSD for Week 6 (Run only if ANOVA was significant):")
+print(post_hoc_wk6)
+# Repeat for Week 6 and Week 8 if their respective ANOVAs were significant.
+```
+
+```{r}
+library(tidyverse)
+library(rstatix) 
+
+# --- Filter and select data ---
+analysis_data <- Blood_count %>%
+  dplyr::select(Groupe_factor, week_factor, Shark_Id, Monocyte_wbc) %>%
+  drop_na(Monocyte_wbc)
+
+# --- Run One-Way ANOVA on each Week separately ---
+anova_results <- analysis_data %>%
+  group_by(week_factor) %>%
+  anova_test(Monocyte_wbc ~ Groupe_factor) %>%
+  # Adjust P-values for the three tests (Wk4, Wk6, Wk8) using Bonferroni
+  adjust_pvalue(method = "bonferroni") %>% 
+  add_significance("p.adj")
+
+print("1. ANOVA (Treatment) Results for each Week:")
+print(anova_results)
+
+# --- Post-Hoc Test (if any ANOVA is significant, P.adj < 0.05) ---
+# If a specific week's ANOVA is significant, you must run Tukey's HSD:
+
+post_hoc_wk8 <- analysis_data %>%
+  filter(week_factor == 8) %>%
+  tukey_hsd(Monocyte_wbc ~ Groupe_factor) %>%
+  add_significance()
+
+print("2. Post-Hoc Tukey HSD for Week 8 (Run only if ANOVA was significant):")
+print(post_hoc_wk8)
+# Repeat for Week 6 and Week 8 if their respective ANOVAs were significant.
+```
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+
+# --- 1. Rank Transformation ---
+# Apply a rank transformation to the CE data across all observations
+Blood_count$CE_rank <- rank(Blood_count$CE_wbc)
+
+lmm_ce_rank <- lmer(
+  CE_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_count
+)
+print("--- ANOVA on Rank-Transformed CE Data (Impact of Time and Group) ---")
+anova_result <- anova(lmm_ce_rank)
+print(anova_result)
+
+
+print("\n--- Non-Parametric Week Comparisons (Within Groups) ---")
+emms_ce_rank <- emmeans(lmm_ce_rank, specs = ~ week_factor | Groupe_factor)
+
+# Pairwise comparisons of weeks within each treatment group
+pairs_ce_rank <- pairs(emms_ce_rank, adjust = "bonferroni")
+print(pairs_ce_rank)
+
+library(DHARMa)
+
+
+print("--- DHARMa Residual Diagnostics for CE Rank-LMM ---")
+
+res_ce_rank <- simulateResiduals(
+  fittedModel = lmm_ce_rank, 
+  n = 1000, 
+  plot = TRUE
+)
+
+# 1. Check for Uniformity (Overall Fit)
+# P-value must be >= 0.05
+testUniformity(res_ce_rank) 
+
+# 2. Check for Dispersion (Over/Under-dispersion)
+# P-value must be >= 0.05
+testDispersion(res_ce_rank) 
+
+# 3. Check for Zero-Inflation (Was the ranking effective?)
+# P-value must be >= 0.05
+testZeroInflation(res_ce_rank)
+testQuantiles(res_ce_rank, plot = TRUE)
+library(emmeans)
+
+# Assuming 'lmm_ce_rank' is the LMM fitted to the CE_rank variable
+
+# 1. Calculate Estimated Marginal Means (EMMs) for the Groupe_factor, 
+#    averaging across the levels of week_factor.
+emms_ce_group <- emmeans(lmm_ce_rank, specs = ~ Groupe_factor)
+
+print("--- Estimated Marginal Means (Ranks) for Treatment Groups ---")
+print(emms_ce_group)
+
+# 2. Perform all pairwise comparisons between groups using the Tukey adjustment.
+pairs_ce_group <- pairs(emms_ce_group, adjust = "tukey")
+
+print("\n--- Pairwise Comparison of Treatment Groups (Control vs. Summer vs. Winter) ---")
+print(pairs_ce_group)
+library(emmeans)
+emms_ce_week_group <- emmeans(lmm_ce_rank, specs = ~ Groupe_factor | week_factor)
+summary(lmm_ce_rank)
+# Perform pairwise comparisons using Tukey adjustment
+pairs_ce_week_group <- pairs(emms_ce_week_group, adjust = "tukey")
+
+# Print the results to the console for a quick check
+print("--- Pairwise Comparisons of Groups WITHIN Each Week (CE Rank) ---")
+print(pairs_ce_week_group)
+
+# --- 2. Prepare Data for Excel Export ---
+
+# Convert the emmeans pairs object to a data frame
+pairs_ce_df <- as.data.frame(pairs_ce_week_group)
+
+# Separate the 'contrast' column into clean Group/Week columns for better Excel readability
+pairs_ce_df_export <- pairs_ce_df %>%
+  # Separate the original contrast (e.g., 'Control - Summer')
+  separate(contrast, into = c("Group1", "Group2"), sep = " - ", remove = TRUE) %>%
+  # Clean up column names and add significance flags
+  mutate(
+    # The 'week_factor' column already contains the week the comparison was performed at.
+    Direction = ifelse(estimate > 0, paste(Group1, ">", Group2), paste(Group2, ">", Group1)),
+    Significant = ifelse(p.value < 0.05, "Yes", "No")
+  ) %>%
+  # Select and reorder columns for a clean Excel table
+  select(
+    week_factor, Group1, Group2, estimate, SE, df, t.ratio, p.value, Significant, Direction
+  ) %>%
+  rename(
+      # Rename 'week_factor' to 'Week' for clarity
+      Week = week_factor,
+      `P-Value` = p.value,
+      Estimate = estimate
+  )
+
+# --- 3. Export to Excel ---
+write_xlsx(pairs_ce_df_export, "CE_Within_Week_Group_Comparisons.xlsx")
+
+print("\nSuccessfully created and exported: CE_Within_Week_Group_Comparisons.xlsx")
+
+```
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(DHARMa)
+
+# --- 1. Rank Transformation ---
+# Apply a rank transformation to the Monocyte data across all observations
+Blood_count$Monocyte_rank <- rank(Blood_count$Monocyte_wbc)
+
+# --- 2. Fit LMM to the Ranks ---
+# We use the LMM on ranks to handle unbalanced data (N changing over time).
+lmm_monocyte_rank <- lmer(
+  Monocyte_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+  data = Blood_count
+)
+
+# --- 3. Overall ANOVA (Effect of Time and Group) ---
+print("--- ANOVA on Rank-Transformed Monocyte Data ---")
+anova_result_monocyte <- anova(lmm_monocyte_rank)
+print(anova_result_monocyte)
+
+# --- 4. Diagnostics Check (CRUCIAL) ---
+print("\n--- DHARMa Residual Diagnostics ---")
+res_monocyte_rank <- simulateResiduals(
+  fittedModel = lmm_monocyte_rank, 
+  n = 1000, 
+  plot = TRUE
+)
+
+testUniformity(res_monocyte_rank)
+testDispersion(res_monocyte_rank) 
+testZeroInflation(res_monocyte_rank)
+
+# --- 5. Post-Hoc Analysis (Within-Group Week Comparison) ---
+print("\n--- Non-Parametric Week Comparisons (Within Groups) ---")
+emms_monocyte_rank <- emmeans(lmm_monocyte_rank, specs = ~ week_factor | Groupe_factor)
+
+# Pairwise comparisons of weeks within each treatment group
+pairs_monocyte_rank <- pairs(emms_monocyte_rank, adjust = "bonferroni")
+print(pairs_monocyte_rank)
+
+emms_monocyte_week_group <- emmeans(lmm_monocyte_rank, specs = ~ Groupe_factor | week_factor)
+
+overall_groups_monocyte <- pairs(emmeans(lmm_monocyte, ~ Groupe_factor), adjust = "tukey")
+overall_weeks_monocyte <- pairs(emmeans(lmm_monocyte, ~ week_factor), adjust = "tukey")
+
+# Pairwise comparisons of groups within each level of week_factor (Tukey adjustment)
+pairs_monocyte_week_group <- pairs(emms_monocyte_week_group, adjust = "tukey")
+
+print("--- Pairwise Comparison of Treatment Groups WITHIN Each Week ---")
+print(pairs_monocyte_week_group)
+
+summary(lmm_monocyte)
+# --- B. Prepare for Excel Export ---
+
+pairs_monocyte_df <- as.data.frame(pairs_monocyte_week_group)
+
+pairs_monocyte_df_export <- pairs_monocyte_df %>%
+  # Separate the original contrast (e.g., 'Control - Summer')
+  separate(contrast, into = c("Group1", "Group2"), sep = " - ", remove = TRUE) %>%
+  # Add significance flags
+  mutate(
+    Direction = ifelse(estimate > 0, paste(Group1, ">", Group2), paste(Group2, ">", Group1)),
+    Significant = ifelse(p.value < 0.05, "Yes", "No")
+  ) %>%
+  # Select and reorder columns
+  select(
+    week_factor, Group1, Group2, estimate, SE, df, t.ratio, p.value, Significant, Direction
+  ) %>%
+  rename(
+      Week = week_factor,
+      `P-Value` = p.value,
+      Estimate = estimate
+  )
+
+write_xlsx(pairs_monocyte_df_export, "Monocyte_Within_Week_Group_Comparisons.xlsx")
+print("\nSuccessfully exported: Monocyte_Within_Week_Group_Comparisons.xlsx")
+
+```
+
+```{r}
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# --- 1. Calculate Summary Statistics (Raw Data) ---
+monocyte_summary <- Blood_count %>%
+  # Group by the factors you want to plot
+  group_by(Sex_factor, Groupe_factor, week_factor) %>%
+  summarise(
+    # Calculate Mean Monocyte percentage
+    mean_monocyte = mean(Monocyte_wbc, na.rm = TRUE),
+    # Calculate Standard Error (SE = SD / sqrt(n))
+    se_monocyte = sd(Monocyte_wbc, na.rm = TRUE) / sqrt(n()),
+    n_obs = n(),
+    .groups = 'drop'
+  )
+
+# --- 2. Create the Faceted Plot ---
+
+# (Assuming 'custom_colors' is defined from previous steps: 
+# custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55"))
+custom_colors <- c(
+  "Control" = "#C8C0A9",
+  "Winter" = "#3182BD",
+  "Summer" = "#D97A66"
+)
+p_monocyte_faceted <- ggplot(
+  monocyte_summary, 
+  aes(x = week_factor, y = mean_monocyte, fill = Groupe_factor)
+) +
+  # Bar chart for the mean
+  geom_bar(
+    stat = "identity", 
+    position = position_dodge(width = 0.9), 
+    color = "black"
+  ) +
+  # Error bars for the Standard Error
+  geom_errorbar(
+    aes(ymin = mean_monocyte - se_monocyte, ymax = mean_monocyte + se_monocyte),
+    width = 0.2, 
+    position = position_dodge(width = 0.9), 
+    linewidth = 0.8
+  ) +
+  # Apply the custom colors
+  scale_fill_manual(values = custom_colors) +
+  
+  # --- CRITICAL: Facet by Sex_factor ---
+  facet_wrap(
+    ~ Sex_factor, 
+    scales = "fixed" # Ensures the Y-axis scale is the same for both plots
+  ) +
+  
+  # Labels and Theme
+  labs(
+    title = "Monocyte Percentage Across Weeks and Groups, Split by Sex",
+    x = "Week",
+    y = "Mean Monocyte (%) ± SE",
+    fill = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "gray90", color = "black"),
+        panel.spacing = unit(1, "lines")) # Add space between facets
+
+print(p_monocyte_faceted)
+```
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+custom_colors <- c(
+  "Control" = "#C8C0A9",
+  "Winter" = "#3182BD",
+  "Summer" = "#D97A66"
+)
+# Ensure all factors are correctly set up (Groupe_factor, week_factor, Sex_factor)
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex)
+  )
+
+# --- 1. Calculate Summary Statistics (Raw Data) ---
+ce_summary <- Blood_count %>%
+  # Group by the factors you want to plot
+  group_by(Sex_factor, Groupe_factor, week_factor) %>%
+  summarise(
+    # Calculate Mean CE percentage
+    mean_ce = mean(CE_wbc, na.rm = TRUE),
+    # Calculate Standard Error (SE = SD / sqrt(n))
+    se_ce = sd(CE_wbc, na.rm = TRUE) / sqrt(n()),
+    n_obs = n(),
+    .groups = 'drop'
+  )
+
+# --- 2. Create the Faceted Plot ---
+
+# Note: The 'custom_colors' vector must be defined in your R session.
+
+p_ce_faceted <- ggplot(
+  ce_summary, 
+  aes(x = week_factor, y = mean_ce, fill = Groupe_factor)
+) +
+  # Bar chart for the mean
+  geom_bar(
+    stat = "identity", 
+    position = position_dodge(width = 0.9), 
+    color = "black"
+  ) +
+  # Error bars for the Standard Error
+  geom_errorbar(
+    aes(ymin = mean_ce - se_ce, ymax = mean_ce + se_ce),
+    width = 0.2, 
+    position = position_dodge(width = 0.9), 
+    linewidth = 0.8
+  ) +
+  # Apply the custom colors
+  scale_fill_manual(values = custom_colors) +
+  
+  # --- CRITICAL: Facet by Sex_factor ---
+  facet_wrap(
+    ~ Sex_factor, 
+    scales = "fixed" # Ensures the Y-axis scale is the same for both plots
+  ) +
+  
+  # Labels and Theme
+  labs(
+    title = "CE Percentage Across Weeks and Groups, Split by Sex",
+    x = "Week",
+    y = "Mean CE (%) ± SE",
+    fill = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "gray90", color = "black"),
+        panel.spacing = unit(1, "lines"))
+
+print(p_ce_faceted)
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Ensure all factors are correctly set up (Groupe_factor, week_factor, Sex_factor)
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex)
+  )
+
+# --- 1. Calculate Summary Statistics (Raw Data) ---
+lympho_summary <- Blood_count %>%
+  # Group by the factors you want to plot
+  group_by(Sex_factor, Groupe_factor, week_factor) %>%
+  summarise(
+    # Calculate Mean Lymphocyte percentage
+    mean_lympho = mean(Lympho_wbc, na.rm = TRUE),
+    # Calculate Standard Error (SE = SD / sqrt(n))
+    se_lympho = sd(Lympho_wbc, na.rm = TRUE) / sqrt(n()),
+    n_obs = n(),
+    .groups = 'drop'
+  )
+
+# --- 2. Create the Faceted Plot ---
+
+# Note: The 'custom_colors' vector must be defined in your R session.
+
+p_lympho_faceted <- ggplot(
+  lympho_summary, 
+  aes(x = week_factor, y = mean_lympho, fill = Groupe_factor)
+) +
+  # Bar chart for the mean
+  geom_bar(
+    stat = "identity", 
+    position = position_dodge(width = 0.9), 
+    color = "black"
+  ) +
+  # Error bars for the Standard Error
+  geom_errorbar(
+    aes(ymin = mean_lympho - se_lympho, ymax = mean_lympho + se_lympho),
+    width = 0.2, 
+    position = position_dodge(width = 0.9), 
+    linewidth = 0.8
+  ) +
+  # Apply the custom colors
+  scale_fill_manual(values = custom_colors) +
+  
+  # --- CRITICAL: Facet by Sex_factor ---
+  facet_wrap(
+    ~ Sex_factor, 
+    scales = "fixed" # Ensures the Y-axis scale is the same for both plots
+  ) +
+  
+  # Labels and Theme
+  labs(
+    title = "Lymphocyte Percentage Across Weeks and Groups, Split by Sex",
+    x = "Week",
+    y = "Mean Lymphocyte (%) ± SE",
+    fill = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "gray90", color = "black"),
+        panel.spacing = unit(1, "lines"))
+
+print(p_lympho_faceted)
+```
+
+```{r}
+library(lme4)
+library(dplyr)
+library(stats)
+
+# --- 0. Data Preparation (Create Rank Variables) ---
+
+# Create rank columns for Monocyte and CE
+Blood_count$Monocyte_wbc_rank <- rank(Blood_count$Monocyte_wbc)
+Blood_count$CE_wbc_rank <- rank(Blood_count$CE_wbc)
+
+# Ensure all necessary factors are defined
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Tank_factor = factor(Tank),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# ----------------------------------------------------------------------
+# A. MONOCYTE COMPARISON
+# ----------------------------------------------------------------------
+
+print("--- MONOCYTE (Rank) Model Comparison: Tank and Sex Factors ---")
+
+# Model A (Reduced - No Sex, No Tank)
+model_monocyte_A <- lmer(
+  Monocyte_wbc_rank ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+  data = Blood_count, REML = FALSE
+) 
+
+# Model C (Reduced + Tank - No Sex, Added Tank Factor)
+model_monocyte_C <- lmer(
+  Monocyte_wbc_rank ~ Groupe_factor * week_factor + (1 | Shark_Id_factor) + (1 | Tank_factor),
+  data = Blood_count, REML = FALSE
+)
+
+# Model D (Full + Tank - With Sex, Added Tank Factor)
+model_monocyte_D <- lmer(
+  Monocyte_wbc_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor) + (1 | Tank_factor),
+  data = Blood_count, REML = FALSE
+)
+
+results_monocyte <- data.frame(
+  Variable = "Monocyte",
+  Model = c("A (Best Reduced)", "C (Reduced + Tank)", "D (Full + Tank)"),
+  AIC = c(AIC(model_monocyte_A), AIC(model_monocyte_C), AIC(model_monocyte_D)),
+  BIC = c(BIC(model_monocyte_A), BIC(model_monocyte_C), BIC(model_monocyte_D)),
+  LogLik = c(logLik(model_monocyte_A), logLik(model_monocyte_C), logLik(model_monocyte_D)),
+  df = c(attr(logLik(model_monocyte_A), "df"), attr(logLik(model_monocyte_C), "df"), attr(logLik(model_monocyte_D), "df"))
+)
+
+results_monocyte <- results_monocyte %>% arrange(AIC)
+print(results_monocyte)
+
+cat("\n", rep("-", 60), "\n\n")
+
+# ----------------------------------------------------------------------
+# B. CE COMPARISON
+# ----------------------------------------------------------------------
+
+print("--- CE (Rank) Model Comparison: Tank and Sex Factors ---")
+
+# Model A (Reduced - No Sex, No Tank)
+model_ce_A <- lmer(
+  CE_wbc_rank ~ Groupe_factor * week_factor + (1 | Shark_Id_factor),
+  data = Blood_count, REML = FALSE
+) 
+
+# Model C (Reduced + Tank - No Sex, Added Tank Factor)
+model_ce_C <- lmer(
+  CE_wbc_rank ~ Groupe_factor * week_factor + (1 | Shark_Id_factor) + (1 | Tank_factor),
+  data = Blood_count, REML = FALSE
+)
+
+# Model D (Full + Tank - With Sex, Added Tank Factor)
+model_ce_D <- lmer(
+  CE_wbc_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor) + (1 | Tank_factor),
+  data = Blood_count, REML = FALSE
+)
+
+results_ce <- data.frame(
+  Variable = "CE",
+  Model = c("A (Best Reduced)", "C (Reduced + Tank)", "D (Full + Tank)"),
+  AIC = c(AIC(model_ce_A), AIC(model_ce_C), AIC(model_ce_D)),
+  BIC = c(BIC(model_ce_A), BIC(model_ce_C), BIC(model_ce_D)),
+  LogLik = c(logLik(model_ce_A), logLik(model_ce_C), logLik(model_ce_D)),
+  df = c(attr(logLik(model_ce_A), "df"), attr(logLik(model_ce_C), "df"), attr(logLik(model_ce_D), "df"))
+)
+
+results_ce <- results_ce %>% arrange(AIC)
+print(results_ce)
+```
+```{r}
+
+```
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(DHARMa) 
+library(dplyr)
+library(writexl) # CRITICAL: For exporting to Excel
+
+# --- 0. Data Preparation and Static Fix ---
+
+# CRITICAL FIX 1: Ensure the base column 'Groupe' uses "Static" instead of "Contrôle"
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Static"
+
+Blood_count <- Blood_count %>%
+  mutate(
+    week_factor = factor(week),
+    Groupe_factor = factor(
+      Groupe, 
+      levels = c("Winter", "Static", "Summer") # Ensure final order
+    ),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# --- 1. Fit LMM using the RAW variable (Neutrophil_wbc) ---
+lmm_neutrophil_raw <- lmer(Neutro_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+                           data = Blood_count)
+summary(lmm_neutrophil_raw)
+print(lmm_neutrophil_raw)
+anova(lmm_neutrophil_raw)
+
+# --- 2. Model Validation (DHARMa Residuals) ---
+# Validation is still good practice even if the variable is raw
+simulationOutput_neutrophil <- simulateResiduals(lmm_neutrophil_raw)
+testUniformity(simulationOutput_neutrophil)
+testDispersion(simulationOutput_neutrophil)
+testOutliers(simulationOutput_neutrophil)
+
+# --- 3. Post-hoc comparisons: Groupe × Week ---
+emms_neutrophil_raw <- emmeans(lmm_neutrophil_raw, ~ Groupe_factor * week_factor)
+pairs_neutrophil_raw <- pairs(emms_neutrophil_raw, adjust = "tukey")
+
+# Convert to data frame for export
+pairs_neutrophil_df <- as.data.frame(pairs_neutrophil_raw) 
+
+# --- 4. Post-hoc comparisons: Sex within each Groupe × Week ---
+emms_sex_neutrophil_raw <- emmeans(lmm_neutrophil_raw, ~ Sex_factor | Groupe_factor * week_factor)
+pairs_sex_neutrophil_raw <- pairs(emms_sex_neutrophil_raw, adjust = "tukey")
+
+# Convert to data frame for export
+pairs_sex_df <- as.data.frame(pairs_sex_neutrophil_raw)
+
+# --- 5. EXPORT RESULTS TO EXCEL ---
+write_xlsx(
+  list(
+    "Groupe_x_Week_Pairs" = pairs_neutrophil_df,
+    "Sex_within_GxW_Pairs" = pairs_sex_df
+  ), 
+  path = "Neutrophil_LMM_Results.xlsx"
+)
+
+# Print summaries for immediate review
+print(summary(lmm_neutrophil_raw))
+print(summary(pairs_neutrophil_raw))
+print(summary(pairs_sex_neutrophil_raw))
+```
+
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    immature = `[immature]`,
+    mitosis   = `[mitosis]`,
+    abnormal  = `[abnormal]`
+  )
+```
+```{r}
+# Shapiro tests
+shapiro.test(Blood_count$immature)
+shapiro.test(Blood_count$mitosis)
+shapiro.test(Blood_count$abnormal)
+
+# Levene tests
+leveneTest(Blood_count$immature ~ Groupe_factor, Blood_count)
+leveneTest(Blood_count$mitosis ~ Groupe_factor, Blood_count)
+leveneTest(Blood_count$abnormal ~ Groupe_factor, Blood_count)
+
+```
+```{R}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(DHARMa)
+library(glmmTMB)
+library(writexl)
+
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+Blood_count <- Blood_count %>%
+  mutate(     # rename if your column is `rbc:wbc`
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) # replace with your shark ID column name
+  )
+
+# --- 1. Rank Transformation ---
+# Apply a rank transformation to the Monocyte data across all observations
+Blood_count$Immature_rank <- rank(Blood_count$immature)
+
+# --- 2. Fit LMM to the Ranks ---
+# We use the LMM on ranks to handle unbalanced data (N changing over time).
+lmm_Immature_rank <-  glmmTMB(
+  immature ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor), # Conditional (Count) Model
+  ziformula = ~ 1, # Zero-Inflation Model: Intercept-only (constant zero-inflation probability)
+  data = Blood_count,
+  family = nbinom2 # Negative Binomial Type 2 distribution
+)
+
+
+
+# --- 4. Diagnostics Check (CRUCIAL) ---
+print("\n--- DHARMa Residual Diagnostics ---")
+res_immature_rank <- simulateResiduals(
+  fittedModel = lmm_Immature_rank, 
+  n = 1000, 
+  plot = TRUE
+)
+
+testUniformity(res_immature_rank)
+testDispersion(res_immature_rank) 
+testZeroInflation(res_immature_rank)
+
+print(lmm_Immature_rank)
+summary(lmm_Immature_rank)
+# --- 5. Post-Hoc Analysis (Within-Group Week Comparison) ---
+print("\n--- Non-Parametric Week Comparisons (Within Groups) ---")
+emms_immature_rank <- emmeans(lmm_Immature_rank, specs = ~ week_factor | Groupe_factor)
+
+# Pairwise comparisons of weeks within each treatment group
+pairs_immature_rank <- pairs(emms_immature_rank , adjust = "bonferroni")
+print(pairs_immature_rank)
+
+emms_immature_week_group <- emmeans(lmm_Immature_rank, specs  = ~ Groupe_factor | week_factor)
+
+overall_groups_immature <- pairs(emmeans(lmm_Immature_rank, ~ Groupe_factor), adjust = "tukey")
+overall_weeks_immature <- pairs(emmeans(lmm_Immature_rank, ~ week_factor), adjust = "tukey")
+
+# Pairwise comparisons of groups within each level of week_factor (Tukey adjustment)
+pairs_immature_week_group <- pairs(emms_immature_week_group, adjust = "tukey")
+
+print("--- Pairwise Comparison of Treatment Groups WITHIN Each Week ---")
+print(pairs_immature_week_group)
+pairs_df <- as.data.frame(pairs_immature_week_group)
+output_path <- "Immature_Group_Comparisons.xlsx"
+
+# Write the data frame to the Excel file
+write_xlsx(
+  x = pairs_df,
+  path = output_path
+)
+
+print(paste("Successfully exported to:", output_path))
+```
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(DHARMa)
+library(glmmTMB)
+library(writexl)
+
+
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+Blood_count <- Blood_count %>%
+  mutate(     # rename if your column is `rbc:wbc`
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id),
+    mitosis = `[mitosis]`
+  )
+
+# NOTE: The data frame 'Blood_count' must contain the 'mitosis' variable
+# and all required factor columns (Groupe_factor, week_factor, Sex_factor, Shark_Id_factor).
+
+# --- 1. Fit ZINB GLMM for Mitosis Counts ---
+# Fitting the Zero-Inflated Negative Binomial model to count data.
+print("--- Fitting Mitosis GLMM (Zero-Inflated Negative Binomial) ---")
+lmm_mitosis_zinb <- glmmTMB(
+  mitosis ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor), # Conditional (Count) Model
+  ziformula = ~ 1, # Zero-Inflation Model: Intercept-only
+  data = Blood_count,
+  family = nbinom2 # Negative Binomial Type 2 distribution
+)
+
+print(summary(lmm_mitosis_zinb))
+
+# --- 2. Diagnostics Check (CRUCIAL) ---
+print("\n--- DHARMa Residual Diagnostics for Mitosis Model ---")
+# Simulating residuals to check model fit
+res_mitosis_zinb <- simulateResiduals(
+  fittedModel = lmm_mitosis_zinb, 
+  n = 500, # Use a reasonable number of simulations
+  plot = TRUE # Plots the diagnostic figures
+)
+
+testUniformity(res_mitosis_zinb)
+testDispersion(res_mitosis_zinb) 
+testZeroInflation(res_mitosis_zinb)
+
+
+# --- 3. Post-Hoc Analysis - Two Interaction Slices ---
+
+# a) Comparison of WEEKS within each treatment GROUP (e.g., Control w4 vs Control w6)
+# This addresses your request for 'contorl 4 to control 6' type comparisons.
+print("\n--- Pairwise Comparison of WEEKS WITHIN Each Treatment Group (Bonferroni) ---")
+emms_mitosis_weeks_within_groups <- emmeans(lmm_mitosis_zinb, specs = ~ week_factor | Groupe_factor)
+pairs_mitosis_weeks_within_groups <- pairs(emms_mitosis_weeks_within_groups , adjust = "bonferroni")
+print(pairs_mitosis_weeks_within_groups)
+
+
+# b) Comparison of GROUPS within each WEEK (e.g., Control w4 vs TreatmentA w4)
+# This addresses your request for comparisons of groups 'across time' (at specific time points).
+print("\n--- Pairwise Comparison of GROUPS WITHIN Each Week (Tukey) ---")
+emms_mitosis_groups_within_weeks <- emmeans(lmm_mitosis_zinb, specs  = ~ Groupe_factor | week_factor)
+pairs_mitosis_groups_within_weeks <- pairs(emms_mitosis_groups_within_weeks, adjust = "tukey")
+print(pairs_mitosis_groups_within_weeks)
+
+
+# --- 4. Export to Single Excel File with Multiple Sheets using writexl ---
+
+# Convert both emmeans objects into standard R data frames
+weeks_within_groups_df <- as.data.frame(pairs_mitosis_weeks_within_groups)
+groups_within_weeks_df <- as.data.frame(pairs_mitosis_groups_within_weeks)
+
+
+# Create a NAMED LIST of data frames. The names become the sheet names in the Excel file.
+list_to_export <- list(
+  "Weeks_Within_Groups" = weeks_within_groups_df, # Sheet 1: Time trends in each treatment
+  "Groups_Within_Weeks" = groups_within_weeks_df  # Sheet 2: Treatment differences at each time point
+)
+
+
+# Define the output path
+output_path <- "Mitosis_PostHoc_Comparisons.xlsx"
+
+# Write the list of data frames to the Excel file
+write_xlsx(
+  x = list_to_export,
+  path = output_path
+)
+
+print(paste("\nSuccessfully exported two pairwise comparison tables to a single Excel file:", output_path))
+print("The file contains two sheets: 'Weeks_Within_Groups' and 'Groups_Within_Weeks'")
+```
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(writexl)
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+Blood_count <- Blood_count %>%
+  mutate(     # rename if your column is `rbc:wbc`
+    week_factor = factor(week),
+    Groupe_factor = factor(Groupe),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id) # replace with your shark ID column name
+  )
+
+# NOTE: The data frame 'Blood_count' must contain the 'abnormal' variable
+# and all required factor columns (Groupe_factor, week_factor, Sex_factor, Shark_Id_factor).
+
+# --- 1. Create Ranked Variable ---
+print("--- Creating Ranked Variable for 'abnormal' ---")
+# Creates a new column 'abnormal_rank' based on the overall rank of 'abnormal' scores.
+Blood_count$abnormal_rank <- rank(Blood_count$abnormal, ties.method = "average")
+
+
+# --- 2. Fit LMM to the Ranks ---
+# We fit a standard Linear Mixed Model (LMM) to the ranked data.
+print("\n--- Fitting LMM to Ranks of 'abnormal' ---")
+lmm_abnormal_rank <- lmer(
+  abnormal_rank ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor), 
+  data = Blood_count
+)
+
+print(summary(lmm_abnormal_rank))
+print(anova(lmm_abnormal_rank)) # ANOVA for testing main effects and interaction
+
+
+# --- 3. Post-Hoc Analysis - Two Interaction Slices ---
+# Post-hoc tests are performed on the LMM object using emmeans.
+# Results are interpreted based on the mean ranks.
+
+# a) Comparison of WEEKS within each treatment GROUP
+print("\n--- Pairwise Comparison of WEEKS WITHIN Each Treatment Group (Bonferroni) ---")
+emms_abnormal_rank_weeks_within_groups <- emmeans(lmm_abnormal_rank, specs = ~ week_factor | Groupe_factor)
+pairs_abnormal_rank_weeks_within_groups <- pairs(emms_abnormal_rank_weeks_within_groups, adjust = "bonferroni")
+print(pairs_abnormal_rank_weeks_within_groups)
+
+
+# b) Comparison of GROUPS within each WEEK
+print("\n--- Pairwise Comparison of GROUPS WITHIN Each Week (Tukey) ---")
+emms_abnormal_rank_groups_within_weeks <- emmeans(lmm_abnormal_rank, specs  = ~ Groupe_factor | week_factor)
+pairs_abnormal_rank_groups_within_weeks <- pairs(emms_abnormal_rank_groups_within_weeks, adjust = "tukey")
+print(pairs_abnormal_rank_groups_within_weeks)
+# --- 3. Diagnostics Check (CRUCIAL) ---
+print("\n--- DHARMa Residual Diagnostics for LMM on Ranks ---")
+# Simulating residuals to check model fit on the rank scale
+# NOTE: DHARMa is designed for GLMMs, but works well for LMMs to check for
+# homogeneity and outliers. We treat the LMM as a conditional model here.
+res_abnormal_rank <- simulateResiduals(
+  fittedModel = lmm_abnormal_rank, 
+  n = 500, # Use a reasonable number of simulations
+  plot = TRUE # Plots the diagnostic figures
+)
+testUniformity(res_abnormal_rank) 
+# Test for over/under-dispersion (less relevant for LMM on ranks, but good to run)
+testDispersion(res_abnormal_rank)
+# --- 4. Export to Single Excel File with Multiple Sheets using writexl ---
+
+# Convert both emmeans objects into standard R data frames
+weeks_within_groups_rank_df <- as.data.frame(pairs_abnormal_rank_weeks_within_groups)
+groups_within_weeks_rank_df <- as.data.frame(pairs_abnormal_rank_groups_within_weeks)
+
+
+# Create a NAMED LIST of data frames.
+list_to_export <- list(
+  "Rank_Weeks_Within_Groups" = weeks_within_groups_rank_df, 
+  "Rank_Groups_Within_Weeks" = groups_within_weeks_rank_df  
+)
+
+
+# Define the output path
+output_path <- "Abnormal_Rank_PostHoc_Comparisons.xlsx"
+
+# Write the list of data frames to the Excel file
+write_xlsx(
+  x = list_to_export,
+  path = output_path
+)
+
+print(paste("\nSuccessfully exported two pairwise comparison tables to a single Excel file:", output_path))
+print("The file contains two sheets: 'Rank_Weeks_Within_Groups' and 'Rank_Groups_Within_Weeks'")
+```
+```{r}
+library(dplyr)
+library(rstatix)
+library(writexl)
+
+# --- 1. Filter Data for Week 4 ---
+Blood_count_W4 <- Blood_count %>%
+  filter(week_factor == "4")
+
+# --- 2. Kruskal-Wallis Test across Groups at Week 4 ---
+# Test for an overall difference in medians among the groups.
+kruskal_W4_groups <- Blood_count_W4 %>%
+  kruskal_test(mitosis ~ Groupe_factor)
+
+# --- 3. Post-hoc Pairwise Wilcoxon Tests for Group Differences ---
+# Test all pairs of groups, correcting for multiple comparisons (using Benjamini-Hochberg).
+pairwise_W4_groups <- Blood_count_W4 %>%
+  pairwise_wilcox_test(
+    mitosis ~ Groupe_factor,
+    p.adjust.method = "BH", 
+    detailed = TRUE # Shows full statistics, including T and P values
+  )
+
+# --- 4. Print Results ---
+print("--- Kruskal-Wallis Test (Overall Group Difference at Week 4) ---")
+print(kruskal_W4_groups)
+print("\n--- Pairwise Wilcoxon Tests (Specific Group Differences at Week 4) ---")
+print(pairwise_W4_groups)
+
+# --- 5. Export to Excel (Optional but Recommended) ---
+# Creates a list for export
+list_to_export <- list(
+  "Kruskal_Wallis_W4" = as.data.frame(kruskal_W4_groups), 
+  "Pairwise_Wilcox_W4" = as.data.frame(pairwise_W4_groups)
+)
+
+output_path <- "Mitotic_W4_Group_Differences.xlsx"
+write_xlsx(x = list_to_export, path = output_path)
+
+print(paste("\nSuccessfully exported results to:", output_path))
+```
+
+```{r}
+library(dplyr)
+library(rstatix) 
+
+# Filter data for Week 4
+Blood_count_W4 <- Blood_count %>%
+  filter(week_factor == "4")
+
+# Kruskal-Wallis test across groups for week 4 (Overall test)
+kruskal_W4_groups <- Blood_count_W4 %>%
+  kruskal_test(mitosis ~ Groupe_factor)
+print(kruskal_W4_groups)
+
+# Post-hoc pairwise Wilcoxon tests to see difference statistics between groups
+pairwise_W4_groups <- Blood_count_W4 %>%
+  pairwise_wilcox_test(
+    mitosis ~ Groupe_factor,
+    p.adjust.method = "BH"
+  )
+print(pairwise_W4_groups)
+```
+

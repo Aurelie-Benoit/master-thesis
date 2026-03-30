@@ -1,0 +1,108 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("Blood_count.xlsx")
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `wbc%` = `Percent wbc`
+  )
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks-Id`
+  )
+```
+
+```{r}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    esr        = `ESR (mm/h)`
+  )
+```
+
+```{r}
+Blood_data_clean <- Blood_count %>%
+  select(
+    Groupe,
+    Shark_Id,
+    Sex,
+    week,
+    total_cell, 
+    Eggs,
+    `wbc%`,
+    esr
+  ) %>%
+  filter(
+    !is.na(total_cell) & 
+    !is.na(Groupe) & 
+    !is.na(week)
+)
+```
+
+```{r}
+cat("Original rows:", nrow(Blood_count), "\n")
+cat("Cleaned rows:", nrow(Blood_data_clean), "\n")
+head(Blood_data_clean)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+```{r}
+Blood_data_clean <- Blood_data_clean %>%
+  mutate(
+    Groupe = as.factor(Groupe),
+    week = as.factor(week),
+    `wbc%` = as.numeric(`wbc%`)
+  )
+```
+
+```{r}
+# Ensure numeric column
+Blood_data_clean$wbc <- as.numeric(Blood_data_clean$`wbc%`)
+
+# Calculate mean
+mean_wbc <- aggregate(wbc ~ Groupe + week, data = Blood_data_clean, FUN = mean)
+
+# Calculate SD
+sd_wbc <- aggregate(wbc ~ Groupe + week, data = Blood_data_clean, FUN = sd)
+
+# Combine into one summary dataframe
+Blood_summary <- merge(mean_wbc, sd_wbc, by = c("Groupe", "week"))
+colnames(Blood_summary) <- c("Groupe", "week", "mean_wbc", "sd_wbc")
+
+# Inspect
+print(Blood_summary)
+
+```
+
+```{r}
+ggplot(Blood_summary, aes(x = factor(week), y = mean_wbc, fill = Groupe)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = mean_wbc - sd_wbc, ymax = mean_wbc + sd_wbc),
+                position = position_dodge(width = 0.8), width = 0.2) +
+  labs(title = "Mean WBC% per Group Across Weeks",
+       x = "Week",
+       y = "WBC (%)") +
+  theme_minimal()
+
+```
+

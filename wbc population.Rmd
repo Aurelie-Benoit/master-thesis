@@ -1,0 +1,1266 @@
+---
+title: "wbc population"
+output: html_document
+date: "2025-11-13"
+---
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document: default
+date: "2025-11-10"
+---
+```{r, echo=FALSE}
+ library(readxl)
+library(dplyr)
+library(tidyverse)
+Blood_count <- read_excel("smears_analysis_r_updated14.xlsx")
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `total_cell` = `[Cells] c/ml`
+  )
+
+```
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    `Shark_Id` = `Sharks Id`
+  )
+```
+
+
+
+```{r, echo=FALSE}
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    total_count        = `total count`
+  )
+```
+
+
+```{r}
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+```
+
+
+```{r}
+
+library(tidyverse)
+library(ggplot2)
+
+# First, ensure columns are correctly renamed (if not already)
+Blood_count <- Blood_count %>%
+  dplyr::rename(
+    Lympho_wbc    = `Lympho_wbc%`,
+    GT_wbc        = `GT_wbc%`,
+    FE_wbc        = `FE_wbc%`,
+    CE_wbc        = `CE_wbc%`,
+    Neutro_wbc    = `Neutro_wbc%`,
+    Monocyte_wbc  = `Monocyte_wbc%`,
+    Basophil_wbc  = `basophil_wbc%`
+  )
+
+```
+
+```{r}
+# Filter week 4 and select relevant columns
+week4_data <- Blood_count %>%
+  filter(week_factor == 4) %>%
+  dplyr::select(Groupe_factor, Lympho_wbc, GT_wbc, CE_wbc, FE_wbc, Neutro_wbc, Monocyte_wbc, Basophil_wbc)
+
+# Pivot to long format
+week4_long <- week4_data %>%
+  pivot_longer(
+    cols = Lympho_wbc:Basophil_wbc,
+    names_to = "Leukocyte",
+    values_to = "Percentage"
+  )
+
+# Specify the order of leukocytes
+week4_long$Leukocyte <- factor(week4_long$Leukocyte, 
+                               levels = c("Lympho_wbc", "GT_wbc", "CE_wbc", "FE_wbc", "Neutro_wbc", "Monocyte_wbc", "Basophil_wbc"))
+
+# Plot
+ggplot(week4_long, aes(x = Leukocyte, y = Percentage, fill = Groupe_factor)) +
+  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(stat = "summary", fun.data = mean_se, 
+                position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+   scale_fill_manual(values = c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")) +
+  scale_x_discrete(
+    labels = c(
+      "Lympho_wbc" = "Lymphocyte",
+      "GT_wbc" = "GT",
+      "CE_wbc" = "CE",
+      "FE_wbc" = "FE",
+      "Neutro_wbc" = "Neutrophil",
+      "Monocyte_wbc" = "Monocyte",
+      "Basophil_wbc" = "Basophil"
+    )
+  ) +
+  labs(
+    title = "Leukocyte % by Treatment (Week 4)",
+    x = "Leukocyte Type",
+    y = "Mean % of WBC",
+    fill = "Treatment Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.position = "bottom"
+  )
+```
+```{r}
+# Filter week 4 and select relevant columns
+week6_data <- Blood_count %>%
+  filter(week_factor == 6) %>%
+  dplyr::select(Groupe_factor, Lympho_wbc, GT_wbc, CE_wbc, FE_wbc, Neutro_wbc, Monocyte_wbc, Basophil_wbc)
+
+# Pivot to long format
+week6_long <- week6_data %>%
+  pivot_longer(
+    cols = Lympho_wbc:Basophil_wbc,
+    names_to = "Leukocyte",
+    values_to = "Percentage"
+  )
+# Specify the order of leukocytes
+week6_long$Leukocyte <- factor(week6_long$Leukocyte, 
+                               levels = c("Lympho_wbc", "GT_wbc", "CE_wbc", "FE_wbc", "Neutro_wbc", "Monocyte_wbc", "Basophil_wbc"))
+
+# Plot
+ggplot(week6_long, aes(x = Leukocyte, y = Percentage, fill = Groupe_factor)) +
+  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(stat = "summary", fun.data = mean_se, 
+                position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+   scale_fill_manual(values = c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")) +
+  scale_x_discrete(
+    labels = c(
+      "Lympho_wbc" = "Lymphocyte",
+      "GT_wbc" = "GT",
+      "CE_wbc" = "CE",
+      "FE_wbc" = "FE",
+      "Neutro_wbc" = "Neutrophil",
+      "Monocyte_wbc" = "Monocyte",
+      "Basophil_wbc" = "Basophil"
+    )
+  ) +
+  labs(
+    title = "Leukocyte % by Treatment (Week 6)",
+    x = "Leukocyte Type",
+    y = "Mean % of WBC",
+    fill = "Treatment Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.position = "bottom"
+  )
+```
+
+```{r}
+
+# Filter week 4 and select relevant columns
+week8_data <- Blood_count %>%
+  filter(week_factor == 8) %>%
+  dplyr::select(Groupe_factor, Lympho_wbc, GT_wbc, CE_wbc, FE_wbc, Neutro_wbc, Monocyte_wbc, Basophil_wbc)
+
+# Pivot to long format
+week8_long <- week8_data %>%
+  pivot_longer(
+    cols = Lympho_wbc:Basophil_wbc,
+    names_to = "Leukocyte",
+    values_to = "Percentage"
+  )
+
+# Specify the order of leukocytes
+week8_long$Leukocyte <- factor(week8_long$Leukocyte, 
+                               levels = c("Lympho_wbc", "GT_wbc", "CE_wbc", "FE_wbc", "Neutro_wbc", "Monocyte_wbc", "Basophil_wbc"))
+
+
+# Plot
+ggplot(week8_long, aes(x = Leukocyte, y = Percentage, fill = Groupe_factor)) +
+  geom_bar(stat = "summary", fun = "mean", position = position_dodge(width = 0.8), color = "black") +
+  geom_errorbar(stat = "summary", fun.data = mean_se, 
+                position = position_dodge(width = 0.8), width = 0.2, color = "red") +
+  scale_fill_manual(values = c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")) +
+  scale_x_discrete(
+    labels = c(
+      "Lympho_wbc" = "Lymphocyte",
+      "GT_wbc" = "GT",
+      "CE_wbc" = "CE",
+      "FE_wbc" = "FE",
+      "Neutro_wbc" = "Neutrophil",
+      "Monocyte_wbc" = "Monocyte",
+      "Basophil_wbc" = "Basophil"
+    )
+  ) +
+  labs(
+    title = "Leukocyte % by Treatment (Week 8)",
+    x = "Leukocyte Type",
+    y = "Mean % of WBC",
+    fill = "Treatment Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.title = element_text(size = 12),
+    legend.position = "bottom"
+  )
+
+```
+
+
+
+
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(DHARMa)
+
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# Ensure group names are consistent
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Control"
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+# ============================
+# 1. Lymphocytes
+# ============================
+lmm_CE_wbc <- lmer(CE_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+                   data = Blood_count)
+summary(lmm_CE_wbc)
+
+# Post-hoc
+emms_CE_wbc <- emmeans(lmm_CE_wbc, ~ Groupe_factor * week_factor)
+pairs(emms_CE_wbc, adjust = "tukey")
+emms_CE_wbc_df <- as.data.frame(emms_CE_wbc)
+
+# Plot
+p_CE_wbc<- ggplot(emms_CE_wbc_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "CE_wbc (%)", x = "Week", y = "Predicted % WBC", fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_CE_wbc)
+
+# Diagnostics
+res_CE_wbc <- simulateResiduals(lmm_CE_wbc, n = 1000)
+plot(res_CE_wbc)
+testUniformity(res_CE_wbc)
+testDispersion(res_CE_wbc)
+testZeroInflation(res_CE_wbc)
+```
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(DHARMa)
+
+Blood_count <- Blood_count %>%
+  mutate(
+    Groupe_factor = factor(Groupe),
+    week_factor = factor(week),
+    Sex_factor = factor(Sex),
+    Shark_Id_factor = factor(Shark_Id)
+  )
+
+# Ensure group names are consistent
+Blood_count$Groupe[Blood_count$Groupe == "Contrôle"] <- "Control"
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+# ============================
+# 1. Lymphocytes
+# ============================
+lmm_lympho <- lmer(Lympho_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+                   data = Blood_count)
+summary(lmm_lympho)
+
+# Post-hoc
+emms_lympho <- emmeans(lmm_lympho, ~ Groupe_factor * week_factor)
+pairs(emms_lympho, adjust = "tukey")
+emms_lympho_df <- as.data.frame(emms_lympho)
+
+
+
+
+
+# Plot
+p_lympho <- ggplot(emms_lympho_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "Lymphocytes (%)", x = "Week", y = "Predicted % WBC", fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_lympho)
+
+# Diagnostics
+res_lympho <- simulateResiduals(lmm_lympho, n = 1000)
+plot(res_lympho)
+testUniformity(res_lympho)
+testDispersion(res_lympho)
+testZeroInflation(res_lympho)
+
+# ============================
+# 2. GT
+# ============================
+lmm_gt <- lmer(GT_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+               data = Blood_count)
+summary(lmm_gt)
+
+emms_gt <- emmeans(lmm_gt, ~ Groupe_factor * week_factor)
+pairs(emms_gt, adjust = "tukey")
+emms_gt_df <- as.data.frame(emms_gt)
+
+overall_groups_gt <- pairs(emmeans(lmm_gt, ~ Groupe_factor), adjust = "tukey")
+overall_weeks_gt <- pairs(emmeans(lmm_gt, ~ week_factor), adjust = "tukey")
+
+p_gt <- ggplot(emms_gt_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "GT (%)", x = "Week", y = "Predicted % WBC", fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_gt)
+
+res_gt <- simulateResiduals(lmm_gt, n = 1000)
+plot(res_gt)
+testUniformity(res_gt)
+testDispersion(res_gt)
+testZeroInflation(res_gt)
+
+# ============================
+# 3. FE
+# ============================
+lmm_fe <- lmer(FE_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+               data = Blood_count)
+summary(lmm_fe)
+
+emms_fe <- emmeans(lmm_fe, ~ Groupe_factor * week_factor)
+pairs(emms_fe, adjust = "tukey")
+emms_fe_df <- as.data.frame(emms_fe)
+
+p_fe <- ggplot(emms_fe_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "FE (%)", x = "Week", y = "Predicted % WBC", fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_fe)
+
+res_fe <- simulateResiduals(lmm_fe, n = 1000)
+plot(res_fe)
+testUniformity(res_fe)
+testDispersion(res_fe)
+testZeroInflation(res_fe)
+# --- Compute emmeans and pairwise comparisons for FE ---
+emms_fe <- emmeans(lmm_fe, ~ Groupe_factor * week_factor)
+pairs_fe <- pairs(emms_fe, adjust = "tukey")
+
+overall_groups_fe <- pairs(emmeans(lmm_fe, ~ Groupe_factor), adjust = "tukey")
+overall_weeks_fe <- pairs(emmeans(lmm_fe, ~ week_factor), adjust = "tukey")
+
+# --- Convert to data frame ---
+pairs_fe_df <- as.data.frame(pairs_fe)
+
+# --- Optional: add direction and significance ---
+pairs_fe_df <- pairs_fe_df %>%
+  mutate(
+    Direction = ifelse(estimate > 0, "First > Second", "Second > First"),
+    Significance = ifelse(p.value < 0.05, "Yes", "No")
+  )
+
+# --- Export to Excel ---
+library(writexl)
+write_xlsx(pairs_fe_df, "FE_Pairwise_Comparisons.xlsx")
+
+
+library(writexl)
+library(dplyr)
+library(tidyr)
+
+# --- Function to prepare pairwise df for Excel ---
+prepare_emmeans_df <- function(emms_obj) {
+  df <- as.data.frame(pairs(emms_obj, adjust = "tukey"))
+  
+  # Split contrast into Group1/Week1 and Group2/Week2
+  df <- df %>%
+    separate(contrast, into = c("Group1", "Week1", "minus", "Group2", "Week2"), sep = " ") %>%
+    select(-minus) %>%
+    mutate(
+      Direction = ifelse(estimate > 0, "Group1 > Group2", "Group2 > Group1"),
+      Significant = ifelse(p.value < 0.05, "Yes", "No")
+    )
+  
+  return(df)
+}
+
+# --- Example 1: Lymphocytes ---
+lympho_pairs_df <- prepare_emmeans_df(emms_lympho)
+write_xlsx(lympho_pairs_df, "Lymphocytes_Pairwise.xlsx")
+
+# --- Example 2: Granulocytes (GT) ---
+gt_pairs_df <- prepare_emmeans_df(emms_gt)
+write_xlsx(gt_pairs_df, "GT_Pairwise.xlsx")
+
+
+# 3. CE
+# ============================
+lmm_ce <- lmer(CE_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+               data = Blood_count)
+summary(lmm_ce)
+
+emms_ce <- emmeans(lmm_ce, ~ Groupe_factor * week_factor)
+pairs(emms_ce, adjust = "tukey")
+emms_ce_df <- as.data.frame(emms_ce)
+
+overall_groups_ce <- pairs(emmeans(lmm_ce, ~ Groupe_factor), adjust = "tukey")
+overall_weeks_ce <- pairs(emmeans(lmm_ce, ~ week_factor), adjust = "tukey")
+
+p_ce <- ggplot(emms_ce_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(title = "CE (%)", x = "Week", y = "Predicted % WBC", fill = "Group") +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_ce)
+
+res_ce <- simulateResiduals(lmm_ce, n = 1000)
+plot(res_fe)
+testUniformity(res_ce)
+testDispersion(res_ce)
+testZeroInflation(res_ce)
+# --- Compute emmeans and pairwise comparisons for FE ---
+emms_ce <- emmeans(lmm_ce, ~ Groupe_factor * week_factor)
+pairs_ce <- pairs(emms_ce, adjust = "tukey")
+
+# --- Convert to data frame ---
+pairs_ce_df <- as.data.frame(pairs_ce)
+
+# --- Optional: add direction and significance ---
+pairs_ce_df <- pairs_ce_df %>%
+  mutate(
+    Direction = ifelse(estimate > 0, "First > Second", "Second > First"),
+    Significance = ifelse(p.value < 0.05, "Yes", "No")
+  )
+
+# --- Export to Excel ---
+library(writexl)
+write_xlsx(pairs_ce_df, "CE_Pairwise_Comparisons.xlsx")
+
+
+```
+
+
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(DHARMa)
+library(writexl)
+library(tidyr)
+
+# ============================
+# 1. Fit LMM for Monocytes
+# ============================
+lmm_mono <- lmer(Monocyte_wbc ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor),
+                 data = Blood_count)
+
+# Summary
+summary(lmm_mono)
+
+# ============================
+# 2. Residual diagnostics
+# ============================
+res_mono <- simulateResiduals(lmm_mono, n = 1000)
+plot(res_mono)                # Visual check
+testUniformity(res_mono)      # Normality
+testDispersion(res_mono)      # Overdispersion
+testZeroInflation(res_mono)   # Zero inflation
+
+# ============================
+# 3. Post-hoc comparisons
+# ============================
+emms_mono <- emmeans(lmm_mono, ~ Groupe_factor * week_factor)
+
+# Function to create Excel-friendly table
+prepare_emmeans_df <- function(emms_obj) {
+  df <- as.data.frame(pairs(emms_obj, adjust = "tukey"))
+  
+  # Split contrast into Group1/Week1 and Group2/Week2
+  df <- df %>%
+    separate(contrast, into = c("Group1", "Week1", "minus", "Group2", "Week2"), sep = " ") %>%
+    select(-minus) %>%
+    mutate(
+      Direction = ifelse(estimate > 0, "Group1 > Group2", "Group2 > Group1"),
+      Significant = ifelse(p.value < 0.05, "Yes", "No")
+    )
+  
+  return(df)
+}
+
+# Prepare pairwise table
+mono_pairs_df <- prepare_emmeans_df(emms_mono)
+
+# ============================
+# 4. Export to Excel
+# ============================
+write_xlsx(mono_pairs_df, "Monocytes_Pairwise.xlsx")
+
+```
+
+
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(emmeans)
+
+# --- 1. Get predicted means and convert to data frames ---
+emms_lympho <- as.data.frame(emmeans(lmm_lympho, ~ Groupe_factor * week_factor))
+emms_GT     <- as.data.frame(emmeans(lmm_gt,     ~ Groupe_factor * week_factor))
+emms_FE     <- as.data.frame(emmeans(lmm_fe,     ~ Groupe_factor * week_factor))
+emms_mono     <- as.data.frame(emmeans(lmm_mono,     ~ Groupe_factor * week_factor))
+# --- 2. Add a column indicating the leukocyte ---
+emms_lympho$Leukocyte <- "Lymphocytes"
+emms_GT$Leukocyte     <- "GT"
+emms_FE$Leukocyte     <- "FE"
+emms_mono$Leukocyte     <- "Monocyte"
+# --- 3. Combine all into one dataframe ---
+emms_all <- bind_rows(emms_lympho, emms_GT, emms_FE, emms_mono)
+
+emms_all$Leukocyte <- factor(emms_all$Leukocyte, levels = c("Lymphocytes", "GT", "FE", "Monocyte"))
+# --- 4. Plot with facet ---
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+ggplot(emms_all, aes(x = week_factor, y = emmean, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  facet_wrap(~Leukocyte, scales = "free_y") +
+  scale_fill_manual(values = custom_colors) +
+  labs(
+    x = "Week",
+    y = "Predicted % of WBC",
+    fill = "Group",
+    title = "Predicted leukocyte percentages by group and week"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5, face = "bold"))
+
+```
+```{r}
+library(dplyr)
+library(broom.mixed)
+
+# --- 1. Lymphocytes ---
+lympho_table <- tidy(lmm_lympho) %>%
+  filter(p.value < 0.05) %>%
+  select(term, estimate, std.error, df, statistic, p.value)
+
+# --- 2. GT ---
+GT_table <- tidy(lmm_gt) %>%
+  filter(p.value < 0.05) %>%
+  select(term, estimate, std.error, df, statistic, p.value)
+
+# --- 3. FE ---
+FE_table <- tidy(lmm_fe) %>%
+  filter(p.value < 0.05) %>%
+  select(term, estimate, std.error, df, statistic, p.value)
+
+# --- 4. Display the tables ---
+lympho_table
+GT_table
+FE_table
+
+```
+```{r}
+colnames(Blood_count)
+```
+```{r}
+library(dplyr)
+library(openxlsx)
+
+# Columns of interest
+cols_to_summarize <- c("[Rbc]", "[wbc]", "[Lympho]", "[Granulocyte]", 
+                       "[Thrombo]", "[abnormal]", "[immature]", "[mitosis]")
+
+# Summarize mean ± SD in scientific notation
+summary_table <- Blood_count %>%
+  group_by(Groupe_factor, week_factor) %>%
+  summarise_at(vars(all_of(cols_to_summarize)), 
+               list(~ paste0(format(mean(., na.rm = TRUE), scientific = TRUE, digits = 3),
+                             " ± ", 
+                             format(sd(., na.rm = TRUE), scientific = TRUE, digits = 3)))) %>%
+  ungroup()
+
+# View the table
+print(summary_table)
+
+# Export to Excel
+write.xlsx(summary_table, "Blood_count_summary_full_scientific.xlsx", rowNames = FALSE)
+```
+```{r}
+
+library(tidyverse)
+library(car)
+
+cols_to_test <- c("[Rbc]", "[wbc]", "[Lympho]", "[Granulocyte]", 
+                  "[Thrombo]", "[abnormal]", "[immature]", "[mitosis]")
+
+weeks_to_test <- c(4, 6, 8)
+
+for (wk in weeks_to_test) {
+  cat("\n\n====================================\n")
+  cat("            WEEK", wk, "\n")
+  cat("====================================\n")
+  
+  week_data <- Blood_count %>%
+    filter(week_factor == wk) %>%
+    dplyr::select(Groupe_factor, all_of(cols_to_test))
+  
+  for (col in cols_to_test) {
+    cat("\n-----------------------------\n")
+    cat("Variable:", col, "\n")
+    cat("-----------------------------\n")
+    
+    temp <- week_data %>%
+      dplyr::select(Groupe_factor, all_of(col)) %>%
+      drop_na()
+    
+    # --- SAFE Shapiro test (per group) ---
+    cat("\nShapiro-Wilk Test (per group):\n")
+    groups <- unique(temp$Groupe_factor)
+    for (g in groups) {
+      vec <- temp[temp$Groupe_factor == g, ][[col]]
+      vec <- vec[!is.na(vec)]
+      if (length(vec) < 3) {
+        cat(" Group", g, ": Not enough data (<3 values)\n")
+      } else if (var(vec) == 0) {
+        cat(" Group", g, ": All values identical → Shapiro cannot be computed\n")
+      } else {
+        sh <- tryCatch(shapiro.test(vec), error = function(e) e)
+        if (inherits(sh, "error")) {
+          cat(" Group", g, ": Shapiro failed:", sh$message, "\n")
+        } else {
+          cat(" Group", g, ": p =", format(sh$p.value, digits = 4), "\n")
+        }
+      }
+    }
+    
+    # --- SAFE Levene test (avoid data-mask / dplyr issues) ---
+    cat("\nLevene’s Test for equal variances:\n")
+    
+    # Build a list of numeric vectors by group using base split()
+    grp_list <- split(temp[[col]], temp$Groupe_factor)
+    # compute group variances safely (NA if <2 observations)
+    grp_vars <- sapply(grp_list, function(x) {
+      x <- x[!is.na(x)]
+      if (length(x) < 2) return(NA_real_)
+      var(x)
+    })
+    
+    # Count groups with finite variance > 0 (eligible for Levene)
+    eligible <- sum(!is.na(grp_vars) & grp_vars > 0)
+    
+    if (eligible < 2) {
+      cat(" Levene skipped: need at least two groups with >1 non-missing observation and variance > 0.\n")
+    } else {
+      # Run leveneTest on the temp data frame using the column name safely
+      # Use formula with backticks in case of special characters in colname
+      fmla <- as.formula(paste0("`", col, "` ~ Groupe_factor"))
+      lev <- tryCatch(leveneTest(fmla, data = temp), error = function(e) e)
+      if (inherits(lev, "error")) {
+        cat(" Levene test failed:", lev$message, "\n")
+      } else {
+        print(lev)
+      }
+    }
+  }
+}
+
+cat("\n\n✅ All normality + variance tests completed safely.\n")
+
+```
+
+
+```{r}
+library(tidyverse)
+library(rstatix)
+library(openxlsx)  # for Excel export
+
+cols_to_test <- c("[Rbc]", "[wbc]", "[Lympho]", "[Granulocyte]",
+                  "[Thrombo]", "[abnormal]", "[immature]", "[mitosis]")
+
+weeks_to_test <- c(4, 6, 8)
+
+# Create empty list to store results
+results_list <- list()
+
+for (wk in weeks_to_test) {
+  
+  week_data <- Blood_count %>%
+    filter(week_factor == wk) %>%
+    dplyr::select(Groupe_factor, all_of(cols_to_test))
+  
+  for (col in cols_to_test) {
+    
+    # Kruskal-Wallis test (safe)
+    kw <- tryCatch(
+      kruskal_test(week_data, as.formula(paste0("`", col, "` ~ Groupe_factor"))),
+      error = function(e) NULL
+    )
+    
+    if (!is.null(kw)) {
+      results_list[[length(results_list)+1]] <- tibble(
+        Variable = col,
+        Week = wk,
+        Kruskal_Wallis_p = kw$p,
+        Significant = ifelse(kw$p < 0.05, "Yes", "No")
+      )
+    } else {
+      results_list[[length(results_list)+1]] <- tibble(
+        Variable = col,
+        Week = wk,
+        Kruskal_Wallis_p = NA,
+        Significant = "Error"
+      )
+    }
+    
+  }
+}
+
+# Combine all results into one table
+results_table <- bind_rows(results_list)
+
+# View table
+print(results_table)
+
+# Export to Excel
+write.xlsx(results_table, "Blood_count_KW_summary.xlsx", rowNames = FALSE)
+
+cat("\n✅ Kruskal-Wallis summary table exported to Excel.\n")
+
+```
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(DHARMa)
+
+var_name <- "[Rbc]"
+display_name <- "RBC count"  # clean name for plots/titles
+
+# --- Fit LMM ---
+lmm_rbc <- lmer(as.formula(paste0("`", var_name, "` ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor)")),
+                data = Blood_count)
+
+
+# --- Summary ---
+summary(lmm_rbc)
+
+# --- Post-hoc comparisons ---
+emms_rbc <- emmeans(lmm_rbc, ~ Groupe_factor * week_factor)
+pairs(emms_rbc, adjust = "tukey")
+
+# --- Prepare for plotting ---
+emms_rbc_df <- as.data.frame(emms_rbc)
+
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+p_rbc <- ggplot(emms_rbc_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(
+    title = "Predicted [Rbc] (mean ± SE)",
+    x = "Week",
+    y = "[Rbc]",
+    fill = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_rbc)
+
+# --- Residual diagnostics ---
+res_rbc <- simulateResiduals(fittedModel = lmm_rbc, n = 1000)
+plot(res_rbc)
+testUniformity(res_rbc)
+testDispersion(res_rbc)
+testZeroInflation(res_rbc)
+anova(lmm_rbc)
+# --- Compute emmeans and pairs ---
+emms_rbc <- emmeans(lmm_rbc, ~ Groupe_factor * week_factor)
+pairs_rbc <- pairs(emms_rbc, adjust = "tukey")
+
+# --- Convert to data frame ---
+pairs_rbc_df <- as.data.frame(pairs_rbc)
+
+# --- Add columns for direction and significance ---
+pairs_rbc_df <- pairs_rbc_df %>%
+  mutate(
+    Direction = ifelse(estimate > 0, "First > Second", "Second > First"),
+    Significance = ifelse(p.value < 0.05, "Yes", "No")
+  )
+
+# --- Export to Excel ---
+library(writexl)
+write_xlsx(pairs_rbc_df, "RBC_Pairwise_Comparisons.xlsx")
+
+```
+```{r}
+library(dplyr)
+
+Blood_count %>%
+  group_by(Groupe_factor) %>%
+  summarise(
+    mean_ratio = mean("[Rbc]", na.rm = TRUE),
+    sd_ratio = sd("[Rbc]", na.rm = TRUE),
+    n = n()
+  )
+```
+
+
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(DHARMa)
+
+# Variable to model
+var_name <- "[wbc]"
+display_name <- "WBC count"  # clean name for plots/titles
+
+# --- Fit LMM ---
+lmm_wbc <- lmer(as.formula(paste0("`", var_name, "` ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor)")),
+                data = Blood_count)
+
+# --- Summary ---
+summary(lmm_wbc)
+
+# --- Post-hoc comparisons ---
+emms_wbc <- emmeans(lmm_wbc, ~ Groupe_factor * week_factor)
+pairs(emms_wbc, adjust = "tukey")
+
+# --- Prepare for plotting ---
+emms_wbc_df <- as.data.frame(emms_wbc)
+
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+p_wbc <- ggplot(emms_wbc_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(
+    title = paste("Predicted", display_name, "(mean ± SE)"),
+    x = "Week",
+    y = display_name,
+    fill = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p_wbc)
+anova(lmm_wbc)
+# --- Residual diagnostics ---
+res_wbc <- simulateResiduals(fittedModel = lmm_wbc, n = 1000)
+plot(res_wbc)
+testUniformity(res_wbc)
+testDispersion(res_wbc)
+testZeroInflation(res_wbc)
+# --- Compute emmeans and pairs for WBC ---
+emms_wbc <- emmeans(lmm_wbc, ~ Groupe_factor * week_factor)
+pairs_wbc <- pairs(emms_wbc, adjust = "tukey")
+
+# --- Convert to data frame ---
+pairs_wbc_df <- as.data.frame(pairs_wbc)
+
+# --- Optional: add columns for direction and significance ---
+pairs_wbc_df <- pairs_wbc_df %>%
+  mutate(
+    Direction = ifelse(estimate > 0, "First > Second", "Second > First"),
+    Significance = ifelse(p.value < 0.05, "Yes", "No")
+  )
+
+# --- Export to Excel ---
+library(writexl)
+write_xlsx(pairs_wbc_df, "WBC_Pairwise_Comparisons.xlsx")
+
+```
+```{r}
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(ggplot2)
+library(dplyr)
+library(DHARMa)
+
+var_name <- "[Thrombo]"
+display_name <- "Thrombocyte count"
+
+# Fit LMM
+lmm_thrombo <- lmer(as.formula(paste0("`", var_name, "` ~ Groupe_factor * week_factor + Sex_factor + (1 | Shark_Id_factor)")),
+                    data = Blood_count)
+
+# Summary
+summary(lmm_thrombo)
+
+# Post-hoc comparisons
+emms_thrombo <- emmeans(lmm_thrombo, ~ Groupe_factor * week_factor)
+pairs(emms_thrombo, adjust = "tukey")
+
+# Prepare for plotting
+emms_df <- as.data.frame(emms_thrombo)
+
+custom_colors <- c("Control" = "#009E73", "Winter" = "#56B4E9", "Summer" = "#D55")
+
+p <- ggplot(emms_df, aes(x = week_factor, y = emmean, group = Groupe_factor, fill = Groupe_factor)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.6), color = "black") +
+  geom_errorbar(aes(ymin = emmean - SE, ymax = emmean + SE),
+                width = 0.2, position = position_dodge(width = 0.6), linewidth = 0.8) +
+  scale_fill_manual(values = custom_colors) +
+  labs(
+    title = paste("Predicted", display_name, "(mean ± SE)"),
+    x = "Week",
+    y = display_name,
+    fill = "Group"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(legend.position = "bottom")
+
+print(p)
+anova(lmm_thrombo)
+# Residual diagnostics
+res <- simulateResiduals(fittedModel = lmm_thrombo, n = 1000)
+plot(res)
+testUniformity(res)
+testDispersion(res)
+testZeroInflation(res)
+# --- Compute emmeans and pairs for Thrombocytes ---
+emms_thrombo <- emmeans(lmm_thrombo, ~ Groupe_factor * week_factor)
+pairs_thrombo <- pairs(emms_thrombo, adjust = "tukey")
+
+# --- Convert to data frame ---
+pairs_thrombo_df <- as.data.frame(pairs_thrombo)
+
+# --- Optional: add columns for direction and significance ---
+pairs_thrombo_df <- pairs_thrombo_df %>%
+  mutate(
+    Direction = ifelse(estimate > 0, "First > Second", "Second > First"),
+    Significance = ifelse(p.value < 0.05, "Yes", "No")
+  )
+
+# --- Export to Excel ---
+library(writexl)
+write_xlsx(pairs_thrombo_df, "Thrombocyte_Pairwise_Comparisons.xlsx")
+
+```
+
+```{r}
+library(tidyverse)
+library(rstatix)
+
+var <- "[mitosis]"
+
+# Ensure numeric
+Blood_count[[var]] <- as.numeric(Blood_count[[var]])
+
+cat("\n===== Overall Kruskal–Wallis Test Across Groups (All Weeks) =====\n")
+kw_overall <- kruskal_test(Blood_count, as.formula(paste0("`", var, "` ~ Groupe_factor")))
+print(kw_overall)
+
+cat("\n===== Overall Pairwise Comparisons Across Groups (All Weeks) =====\n")
+pairwise_overall <- Blood_count %>%
+  dunn_test(as.formula(paste0("`", var, "` ~ Groupe_factor")), p.adjust.method = "bonferroni") %>%
+  add_significance()
+print(pairwise_overall)
+
+# --- Week-by-week comparisons ---
+weeks_to_test <- sort(unique(Blood_count$week_factor))
+
+for(wk in weeks_to_test){
+  week_data <- Blood_count %>%
+    filter(week_factor == wk) %>%
+    drop_na(`[mitosis]`)
+  
+  if(length(unique(week_data$Groupe_factor)) < 2){
+    cat("\nWeek", wk, "- not enough groups to compare\n")
+    next
+  }
+  
+  cat("\n===== Week", wk, "Kruskal–Wallis Test =====\n")
+  kw_week <- kruskal_test(week_data, as.formula(paste0("`", var, "` ~ Groupe_factor")))
+  print(kw_week)
+  
+  cat("\n--- Week", wk, "Pairwise Comparisons (Dunn) ---\n")
+  pairwise_week <- week_data %>%
+    dunn_test(as.formula(paste0("`", var, "` ~ Groupe_factor")), p.adjust.method = "bonferroni") %>%
+    add_significance()
+  print(pairwise_week)
+  
+  # Optional: add fold-change relative to Winter median
+  fold_week <- week_data %>%
+    group_by(Groupe_factor) %>%
+    summarise(median_val = median(`[mitosis]`, na.rm = TRUE)) %>%
+    mutate(fold_vs_winter = median_val / median_val[Groupe_factor == "Winter"])
+  cat("\n--- Week", wk, "Median & Fold-change vs Winter ---\n")
+  print(fold_week)
+}
+
+
+```
+
+```{r}
+library(tidyverse)
+library(rstatix)
+
+var <- "[abnormal]"
+
+cat("\n===== Kruskal–Wallis Tests for", var, "=====\n")
+
+# --- 1. Between groups (all weeks combined) ---
+kw_group <- kruskal_test(Blood_count, as.formula(paste0("`", var, "` ~ Groupe_factor")))
+cat("\n--- Between Groups (all weeks combined) ---\n")
+print(kw_group)
+
+# --- 2. Between weeks (all groups combined) ---
+kw_week <- kruskal_test(Blood_count, as.formula(paste0("`", var, "` ~ week_factor")))
+cat("\n--- Between Weeks (all groups combined) ---\n")
+print(kw_week)
+
+# --- 3. Interaction-ish: within each week, compare groups ---
+weeks_to_test <- sort(unique(Blood_count$week_factor))
+cat("\n--- Group comparisons within each week ---\n")
+for(wk in weeks_to_test){
+  week_data <- Blood_count %>%
+    filter(week_factor == wk) %>%
+    select(Groupe_factor, all_of(var)) %>%
+    drop_na()
+  
+  if(length(unique(week_data$Groupe_factor)) < 2){
+    cat("Week", wk, "- not enough groups\n")
+    next
+  }
+  
+  cat("\nWeek", wk, ":\n")
+  kw_week_group <- kruskal_test(week_data, as.formula(paste0("`", var, "` ~ Groupe_factor")))
+  print(kw_week_group)
+}
+
+```
+
+```{r}
+library(tidyverse)
+library(rstatix)
+
+var <- "[immature]"
+
+cat("\n===== Kruskal–Wallis Tests for", var, "=====\n")
+
+# --- 1. Between groups (all weeks combined) ---
+kw_group <- kruskal_test(Blood_count, as.formula(paste0("`", var, "` ~ Groupe_factor")))
+cat("\n--- Between Groups (all weeks combined) ---\n")
+print(kw_group)
+
+# --- 2. Between weeks (all groups combined) ---
+kw_week <- kruskal_test(Blood_count, as.formula(paste0("`", var, "` ~ week_factor")))
+cat("\n--- Between Weeks (all groups combined) ---\n")
+print(kw_week)
+
+# --- 3. Interaction-ish: within each week, compare groups ---
+weeks_to_test <- sort(unique(Blood_count$week_factor))
+cat("\n--- Group comparisons within each week ---\n")
+for(wk in weeks_to_test){
+  week_data <- Blood_count %>%
+    filter(week_factor == wk) %>%
+    select(Groupe_factor, all_of(var)) %>%
+    drop_na()
+  
+  if(length(unique(week_data$Groupe_factor)) < 2){
+    cat("Week", wk, "- not enough groups\n")
+    next
+  }
+  
+  cat("\nWeek", wk, ":\n")
+  kw_week_group <- kruskal_test(week_data, as.formula(paste0("`", var, "` ~ Groupe_factor")))
+  print(kw_week_group)
+}
+
+```
+
+
+```{r}
+# Load necessary libraries
+library(tidyverse)
+library(dplyr) # Explicitly load dplyr
+library(ggplot2) # Explicitly load ggplot2
+
+# --- 0. Data Preparation and Factor Definition FIX ---
+
+# CRITICAL FIX 1: Change the name in the base character column
+Blood_count$Groupe[Blood_count$Groupe == "Control"] <- "Static"
+
+Blood_count <- Blood_count %>% 
+  filter(!is.na(Shark_Id)) %>%
+  mutate(
+    week_factor = factor(week),
+    # CRITICAL FIX 2: Define the plotting factor, enforcing Winter, Static, Summer order
+    Groupe_factor = factor(
+      Groupe, 
+      # Using the final requested order: Winter, Static, Summer
+      levels = c("Winter", "Static", "Summer") 
+    )
+    # Note: Assuming all *_wbc percentage columns are calculated prior to this script.
+  )
+
+# Define the final custom color palette (matching the factor order and established hex codes)
+custom_colors <- c(
+  "Winter" = "#6F9FCC",  # Winter color
+  "Static" = "#D6C9AE",  # Static/Control color
+  "Summer" = "#D97A66"   # Summer color (updated to D97A66 for consistency)
+)
+
+
+# --- Define Plotting Function ---
+
+# This function creates a single bar plot for any given component, faceted by week
+create_component_plot <- function(data, component_col, component_label, colors) {
+  
+  # Note: Backticks (` `) are required for column names with special characters like '%'
+  # The column name is passed as a string, and needs to be converted to a symbol for aes
+  y_var_sym <- sym(component_col)
+  
+  p <- ggplot(data, aes(x = factor(week_factor), y = !!y_var_sym, fill = Groupe_factor)) +
+    
+    # Calculate and plot the mean bar
+    geom_bar(
+      stat = "summary",
+      fun = "mean",
+      position = position_dodge(width = 0.9), 
+      color = "black"
+    )  +
+    # Add error bars (SEM)
+    geom_errorbar(
+      stat = "summary",
+      fun.data = mean_se,
+      position = position_dodge(width = 0.9), # Ensure position is consistent
+      width = 0.2,
+      color = "black"
+    ) +
+    
+    
+    # Apply the custom colors
+    scale_fill_manual(values = colors) +
+    
+    # Labels and theming
+    labs(
+      title = "",
+      x = "", 
+      y = paste0("Mean ", component_label, " %"),
+      fill = "" 
+    ) +
+    scale_x_discrete(labels = c("4" = "Week 4", "6" = "Week 6", "8" = "Week 8")) +
+    
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold"),
+      axis.title.y = element_text(size = 12),
+      axis.text.x = element_text(size = 12, face = "bold"), # Show X-axis tick labels
+      axis.ticks.x = element_line(),
+      legend.position = "bottom"
+    )
+  
+  return(p)
+}
+# --------------------------------------------------------------------
+# --- 2. Generate and Print Plots ---
+# --------------------------------------------------------------------
+
+# 1. Lymphocyte %
+plot_lympho <- create_component_plot(Blood_count, "Lympho_wbc", "Lymphocyte", custom_colors)
+print(plot_lympho)
+
+# 3. GT %
+plot_gt <- create_component_plot(Blood_count, "GT_wbc", "GT", custom_colors)
+print(plot_gt)
+
+# 4. FE %
+plot_fe <- create_component_plot(Blood_count, "FE_wbc", "FE", custom_colors)
+print(plot_fe)
+
+# 5. CE %
+plot_ce <- create_component_plot(Blood_count, "CE_wbc", "CE", custom_colors)
+print(plot_ce)
+
+# 6. Monocyte %
+plot_monocyte <- create_component_plot(Blood_count, "Monocyte_wbc", "Monocyte", custom_colors)
+print(plot_monocyte)
+
+# 7 Neutro
+plot_neutrophil <- create_component_plot(Blood_count, "Neutro_wbc", "Neutrophil", custom_colors)
+print(plot_neutrophil)
+
+```
+
